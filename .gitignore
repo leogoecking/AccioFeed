@@ -1,0 +1,63 @@
+# Environments & Secrets
+.env
+.env*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Testing & Linting
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.ruff_cache/
+.mypy_cache/
+
+# Node & Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+
+# Database / Docker volumes
+postgres_data/
+
+# IDEs & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

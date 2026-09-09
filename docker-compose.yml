@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tech_news_hub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-technewshub}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-technewshub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tech_news_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tech_news_hub_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME:-Tech News Hub}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-technewshub}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:3001","http://127.0.0.1:3000","http://127.0.0.1:3001"]}
+      HN_MAX_STORIES: ${HN_MAX_STORIES:-30}
+      HTTP_REQUEST_TIMEOUT: ${HTTP_REQUEST_TIMEOUT:-15}
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - tech_news_network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tech_news_hub_worker
+    restart: unless-stopped
+    entrypoint: ["python", "-m", "app.workers.runner"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      PROJECT_NAME: ${PROJECT_NAME:-Tech News Hub}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-technewshub}
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-300}
+      HN_MAX_STORIES: ${HN_MAX_STORIES:-30}
+      HTTP_REQUEST_TIMEOUT: ${HTTP_REQUEST_TIMEOUT:-15}
+    networks:
+      - tech_news_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    container_name: tech_news_hub_web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    networks:
+      - tech_news_network
+
+volumes:
+  postgres_data:
+
+networks:
+  tech_news_network:
+    driver: bridge
