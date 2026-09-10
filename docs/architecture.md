@@ -174,6 +174,20 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
 - **Justificativa**: Evita concorrência e condições de corrida entre chamadas simultâneas de sincronização manual. O seed do banco passa a verificar a existência da fonte pelo `slug` e preserva os valores de `is_active` e `poll_interval_minutes` definidos pelo usuário.
 - **Consequência**: O usuário tem total controle sobre fontes ativas, inativas e intervalos customizados através da interface web (`/sources`), sem risco de sobrescrita.
 
+### ADR 13: Arquitetura de Tradução Opcional, Desacoplada e Sob Demanda
+- **Problema**: Como oferecer suporte opcional para leitura de artigos em Português do Brasil (PT-BR) sem acoplamento a um provedor proprietário específico, sem traduzir em massa (evitando custos e rate limits desnecessários), e sem quebrar a aplicação caso o serviço externo esteja desativado ou indisponível?
+- **Alternativas**:
+  1. Traduzir todos os artigos automaticamente durante o ciclo do worker na ingestão.
+  2. Integrar uma biblioteca de tradução embutida no frontend via chamadas de terceiros no browser (vazando API keys e sem cache compartilhado).
+  3. Abstração de provedor (`BaseTranslationProvider`) com implementação funcional do **DeepL**, tradução sob demanda disparada pelo usuário no Reader, persistência relacional de cache (`article_translations`), proteção de concorrência por lock em memória e fallback resiliente que preserva o artigo original.
+- **Escolha**: Abstração de provedor com DeepL, cache relacional persistente e tradução estritamente sob demanda.
+- **Justificativa**:
+  - **Qualidade e Especialização**: O DeepL é amplamente reconhecido como a melhor ferramenta para tradução de terminologia técnica de inglês para português brasileiro (`PT-BR`). O Free Tier oficial oferece 500.000 caracteres/mês gratuitos, ideal para uso pessoal self-hosted.
+  - **Desacoplamento e Segurança**: A chave de API nunca é exposta ao frontend. A interface `BaseTranslationProvider` permite futura adição de `LibreTranslate` (self-hosted) ou `Google Cloud Translation` sem alterar a API ou a UI.
+  - **Eficiência e Cache Persistente**: A tabela `article_translations` funciona como cache permanente. Artigos já traduzidos nunca realizam novas chamadas externas. Artigos que já estão em português (detectados heuristicamente ou pelo feed) são armazenados diretamente sem acionar a API externa.
+  - **Resiliência e Concorrência**: Requisições simultâneas para o mesmo artigo compartilham um lock assíncrono em memória (`_get_lock`), garantindo que apenas uma chamada à API externa seja feita. Se o serviço falhar (timeout, erro 500, cota esgotada), o usuário visualiza uma notificação discreta e pode continuar lendo o texto original sem bloqueio.
+- **Consequência**: Experiência fluida, sem custos acidentais, mantendo o texto original sempre disponível com opção de alternar entre `Original` e `PT-BR`.
+
 ---
 
 ## 4. Segurança e Resiliência
@@ -187,9 +201,15 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
    - Todo conteúdo textual recebido de fontes externas é sanitizado na ingestão via `sanitize_text`.
    - Remoção de scripts, iframes, atributos com handlers `on*` e tags inseguras.
    - Resumos e títulos renderizados com segurança no frontend React.
-3. **Isolamento de Estado do Usuário**:
-   - Tabela `article_states` isolada com índices cobrindo `(article_id, is_read)`, `(article_id, is_favorite)`, `(article_id, is_saved)` e `(is_read, is_hidden, last_opened_at)`.
-4. **CORS e Validação**:
+3. **Segurança de Credenciais e Conteúdo na Tradução**:
+   - Chaves de API de tradução são carregadas via variáveis de ambiente seguras (`TRANSLATION_API_KEY`) e nunca trafegam para o cliente frontend.
+   - Provedores externos nunca recebem logs, dados sensíveis do usuário ou credenciais internas. Apenas `title`, `summary` e blocos de texto necessários à leitura são transmitidos.
+   - Timeouts rigorosos (10s) e retries restritos apenas para falhas de rede transitórias (sem retries infinitos para 401, 403, 429 ou 456).
+4. **Isolamento de Estado do Usuário e Cache de Tradução**:
+   - Tabela `article_states` para engajamento e histórico pessoal.
+   - Tabela `article_translations` com constraint única `(article_id, language)` garantindo idempotência e integridade referencial com cascade delete.
+5. **CORS e Validação**:
    - Configuração de origens CORS explícitas via variável de ambiente `CORS_ORIGINS`.
    - Schemas Pydantic v2 com `extra="forbid"` em schemas de atualização para rejeitar parâmetros maliciosos desconhecidos.
+
 

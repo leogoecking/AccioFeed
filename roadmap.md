@@ -47,25 +47,36 @@ Este roadmap delineia a evolução planejada para o agregador inteligente e self
 
 ---
 
-## Fase 4 — AI & Enriquecimento
-- [ ] Integração com LLM local via Ollama (sem dependência de APIs pagas obrigatórias)
-- [ ] Classificação automática de tópicos (IA, Hardware, Dev, Cybersecurity, Linux, etc.)
-- [ ] Geração de resumos em múltiplos tamanhos (bullets, TL;DR, parágrafo executivo)
-- [ ] Tradução automática de resumos e títulos para português
-- [ ] Deduplicação semântica via embeddings e `pgvector`
+## Fase 4 — Tradução & Experiência de Leitura Multilíngue (Concluída)
+- [x] Abstração extensível de provedores de tradução (`BaseTranslationProvider`)
+- [x] Provedor funcional DeepL (`DeepLProvider`) com suporte a contas gratuitas (Free Tier) e Pro
+- [x] Tradução estritamente sob demanda (on-demand) no modal do leitor (Reader View)
+- [x] Detecção inteligente de idioma para ignorar feeds já em português brasileiro
+- [x] Cache persistente de traduções (`article_translations`) com chave única `(article_id, language)`
+- [x] Prevenção de requisições externas concorrentes simultâneas via lock em memória (`asyncio.Lock`)
+- [x] Fallback resiliente: original permanece sempre disponível em caso de falha do provedor
+- [x] Interface do leitor com alternância instantânea entre `Original` e `PT-BR`, loading discreto e aviso de tradução automática
 
 ---
 
-## Fase 5 — Intelligence & Curation
-- [ ] Algoritmo de ranking personalizado (*TechScore*)
-- [ ] Detecção de tendências (*Trending Topics*) e velocidade de engajamento
-- [ ] Clusterização de matérias de diferentes fontes cobrindo o mesmo evento
-- [ ] Gráfico de engajamento temporal (HN score, contagem de comentários ao longo do dia)
+## Fase 5 — Busca Avançada, Filtros & Curadoria (Próxima Etapa)
+- [ ] Busca textual avançada (Full-Text Search) com PostgreSQL (`tsvector`/`tsquery`)
+- [ ] Importação e exportação de feeds em formato OPML
+- [ ] Filtros combinados por data personalizada, tempo de leitura estimado e ordenação multicritério
+- [ ] Limpeza automática e retenção configurável de artigos antigos (Housekeeping)
 
 ---
 
-## Fase 6 — Content Radar
-- [ ] Cálculo do *Content Potential Score* para criadores de conteúdo
-- [ ] Métricas combinadas: aceleração de votos, volume de discussões, multiplicidade de fontes
-- [ ] Geração assistida de pautas (briefing do tema, ângulos de discussão, ganchos e títulos sugeridos)
-- [ ] Exportação de briefings para ferramentas externas (Markdown, Notion, Obsidian)
+## Fase 6 — Performance, Confiabilidade & Self-Hosting
+- [ ] Otimização de queries com índices parciais e paginação keyset/cursor-based
+- [ ] Exportação de artigos em Markdown / leitor offline local
+- [ ] Painel de métricas de telemetria operacional da coleta e saúde do sistema
+- [ ] Suporte a backups automáticos e migração de banco de dados simplificada
+
+---
+
+## Backlog / Ideias Futuras (Sem prioridade ativa)
+> *Recursos de IA generativa, LLMs e modelos complexos permanecem despriorizados em relação à velocidade, usabilidade e confiabilidade do leitor diário.*
+- [ ] Integração experimental com LLM local via Ollama para geração de resumos TL;DR
+- [ ] Deduplicação semântica e busca por similaridade com embeddings e `pgvector`
+- [ ] Recomendação personalizada com base no histórico local de leitura

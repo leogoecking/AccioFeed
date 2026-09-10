@@ -18,6 +18,12 @@ O **Tech News Hub** é um leitor inteligente e self-hosted de notícias e discus
   - **Favoritos**: biblioteca de artigos destacados com estrela.
   - **Histórico**: cronologia de artigos abertos ordenados por última leitura (`last_opened_at`).
   - **Ocultação de Notícias**: capacidade de esconder itens irrelevantes da timeline.
+- 🌐 **Tradução Opcional para Português (PT-BR)**:
+  - Tradução sob demanda no leitor via API oficial do **DeepL** (Free ou Pro).
+  - Cache relacional persistente no PostgreSQL: cada notícia é traduzida no máximo uma vez.
+  - Alternância instantânea entre texto original e traduzido (`Original | PT-BR`).
+  - Detecção inteligente: notícias que já estão em português são identificadas e não consomem cotas externas.
+  - Resiliência total: em caso de indisponibilidade externa ou cota esgotada, a leitura do original permanece 100% acessível.
 - ⚙️ **Gerenciamento de Fontes Dinâmico (`/sources`)**:
   - Monitoramento operacional de saúde (Healthy, Warning, Error, Disabled).
   - Ativação e desativação em tempo real com toggle switch.
@@ -199,7 +205,38 @@ Ao adicionar ou validar feeds externos, o sistema bloqueia:
 
 ---
 
-## 9. Endpoints da API REST
+## 9. Como Configurar a Tradução Opcional (DeepL)
+
+O Tech News Hub inclui suporte nativo e opcional para tradução sob demanda de artigos para **Português do Brasil (`pt-BR`)** através do provedor **DeepL**:
+
+### 9.1. Ativação no `.env`:
+Por padrão, a tradução vem desativada (`TRANSLATION_ENABLED=false`) e o agregador opera normalmente sem depender de nenhuma chave externa.
+
+Para habilitar a tradução:
+```env
+TRANSLATION_ENABLED=true
+TRANSLATION_PROVIDER=deepl
+TRANSLATION_API_KEY=sua-chave-aqui:fx
+TRANSLATION_TARGET_LANGUAGE=pt-BR
+TRANSLATION_TIMEOUT_SECONDS=10
+```
+
+> **Como obter uma chave gratuita do DeepL**:
+> 1. Crie uma conta no plano gratuito [DeepL API Free](https://www.deepl.com/pro-api).
+> 2. O plano Free concede **500.000 caracteres gratuitos por mês** (suficiente para traduzir centenas de resumos técnicos).
+> 3. Chaves gratuitas possuem o sufixo `:fx` e o sistema conecta automaticamente ao endpoint `https://api-free.deepl.com/v2/translate`. Chaves Pro conectam automaticamente a `https://api.deepl.com/v2/translate`.
+
+### 9.2. Características de Economia e Segurança:
+- **Tradução Estritamente Sob Demanda**: Apenas artigos abertos no leitor e cujo botão "Traduzir para Português" for clicado são enviados para a API externa. Nenhuma tradução em massa ocorre na timeline ou na coleta de feeds.
+- **Cache Persistente no PostgreSQL**: O resultado é gravado na tabela `article_translations`. Aberturas subsequentes do mesmo artigo são lidas diretamente do banco sem qualquer custo ou latência externa.
+- **Proteção contra Concorrência**: Múltiplas requisições simultâneas para o mesmo artigo compartilham um lock assíncrono em memória, realizando exatamente uma única chamada externa.
+- **Detecção Inteligente de Idioma**: Matérias publicadas em português são detectadas heuristicamente e salvas localmente sem consumir sua cota da API.
+- **Fallback Resiliente**: Se a chave for inválida, a cota mensal acabar ou a rede falhar, uma mensagem amigável é exibida e o conteúdo original em inglês permanece 100% legível.
+- **Segurança de Credenciais**: Chaves de API nunca são expostas ao frontend nem gravadas em logs.
+
+---
+
+## 10. Endpoints da API REST
 
 A API expõe endpoints versionados sob `/api/v1`:
 
@@ -217,6 +254,10 @@ A API expõe endpoints versionados sob `/api/v1`:
 - `GET /api/v1/articles/{id}`: Detalhes completos de um artigo individual.
 - `PATCH /api/v1/articles/{id}/state`: Atualiza o estado pessoal do artigo (`is_read`, `is_favorite`, `is_saved`, `is_hidden`).
 - `POST /api/v1/articles/{id}/open`: Registra a abertura do artigo no leitor (marca automaticamente como lido e atualiza `first_opened_at` / `last_opened_at`).
+
+### Tradução de Artigos
+- `GET /api/v1/articles/{id}/translations?language=pt-BR`: Consulta a tradução em cache de um artigo. Retorna 404 se ainda não traduzido.
+- `POST /api/v1/articles/{id}/translations`: Dispara a tradução sob demanda do artigo (verificando cache prévio, aplicando locks de concorrência e persistindo no banco).
 
 ### Fontes e Coleta
 - `GET /api/v1/sources`: Listagem de fontes com status calculado (`healthy`, `error`, `disabled`) e métricas de execução.
@@ -280,6 +321,11 @@ npm run build --prefix frontend
 | `HN_MAX_STORIES` | `30` | Quantidade de histórias por lote na coleta do Hacker News |
 | `HTTP_REQUEST_TIMEOUT` | `15` | Timeout em segundos para requisições externas HTTP |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8001` | URL base da API consumida pelo frontend |
+| `TRANSLATION_ENABLED` | `false` | Habilita ou desabilita o serviço de tradução sob demanda |
+| `TRANSLATION_PROVIDER` | `deepl` | Identificador do provedor de tradução utilizado |
+| `TRANSLATION_API_KEY` | `""` | Chave de autenticação da API de tradução (Free ou Pro) |
+| `TRANSLATION_TARGET_LANGUAGE` | `pt-BR` | Idioma de destino padrão para as traduções |
+| `TRANSLATION_TIMEOUT_SECONDS` | `10` | Timeout estrito para requisições ao provedor de tradução |
 
 ---
 
