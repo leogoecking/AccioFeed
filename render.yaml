@@ -1,0 +1,64 @@
+# Render Blueprint Specification for Tech News Hub
+# https://render.com/docs/blueprint-spec
+
+databases:
+  - name: technewshub-db
+    databaseName: technewshub
+    user: technewshub
+    plan: free
+    region: oregon
+
+services:
+  # 1. FastAPI REST API Backend
+  - type: web
+    name: technewshub-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: technewshub-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: TRANSLATION_ENABLED
+        value: "true"
+      - key: TRANSLATION_PROVIDER
+        value: mymemory
+      - key: TRANSLATION_API_KEY
+        sync: false
+      - key: ENABLE_EMBEDDED_WORKER
+        value: "true"
+      - key: WORKER_INTERVAL_SECONDS
+        value: "300"
+      - key: HN_MAX_STORIES
+        value: "30"
+      - key: HTTP_REQUEST_TIMEOUT
+        value: "15"
+
+  # 2. Next.js Frontend
+  - type: web
+    name: technewshub-web
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: technewshub-api
+          property: host

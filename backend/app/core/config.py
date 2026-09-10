@@ -13,6 +13,20 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/technewshub"
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: Any) -> str:
+        if isinstance(v, str):
+            v_stripped = v.strip()
+            if v_stripped.startswith("postgres://"):
+                return v_stripped.replace("postgres://", "postgresql+asyncpg://", 1)
+            if v_stripped.startswith("postgresql://") and not v_stripped.startswith(
+                "postgresql+asyncpg://"
+            ):
+                return v_stripped.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return v_stripped
+        return str(v)
+
     # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
@@ -37,6 +51,7 @@ class Settings(BaseSettings):
         return ["*"]
 
     # Worker & Ingestion
+    ENABLE_EMBEDDED_WORKER: bool = False
     WORKER_INTERVAL_SECONDS: int = 300
     HN_MAX_STORIES: int = 30
     HTTP_REQUEST_TIMEOUT: int = 15

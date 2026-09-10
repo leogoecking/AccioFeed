@@ -11,7 +11,11 @@ import {
   SyncResponse,
 } from "./types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").trim();
+const API_BASE =
+  rawApiUrl.startsWith("http://") || rawApiUrl.startsWith("https://")
+    ? rawApiUrl
+    : `https://${rawApiUrl}`;
 
 export async function fetchArticles(filters: ArticleFilters = {}): Promise<PaginatedResponse<ArticlePublic>> {
   const params = new URLSearchParams();
