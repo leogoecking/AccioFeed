@@ -19,8 +19,13 @@ echo "Seeding default sources..."
 python -m app.cli seed || echo "Seed skipped or failed."
 
 echo "Starting application server..."
+RELOAD_FLAG=""
+if [ "$DEBUG" = "true" ] || [ "$DEBUG" = "1" ]; then
+  RELOAD_FLAG="--reload"
+fi
+
 if [ -n "$PORT" ] && [ "$1" = "uvicorn" ]; then
-  exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+  exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT" $RELOAD_FLAG
 fi
 
 exec "$@"

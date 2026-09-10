@@ -1,0 +1,27 @@
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    environment:
+      DEBUG: "true"
+
+  worker:
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      INTERNAL_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: ["npm", "run", "dev"]
