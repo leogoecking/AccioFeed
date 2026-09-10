@@ -110,16 +110,50 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
 - **Justificativa**: Permite renderização otimizada, modularidade através de Server/Client components, excelente suporte a TypeScript estrito e flexibilidade para caching e futura extensão para PWA.
 - **Consequência**: Interface responsiva, rápida e elegante com estética moderna de tecnologia.
 
+### ADR 06: Provedor Genérico RSS/Atom e Fábrica Dinâmica
+- **Problema**: Como suportar múltiplos feeds RSS e Atom sem escrever código duplicado para cada publicação jornalística?
+- **Alternativas**:
+  1. Criar uma classe de provedor dedicada para cada site (ex.: `ArsTechnicaProvider`, `TheVergeProvider`, etc.).
+  2. Implementar um provedor parametrizado genérico (`RSSProvider`) alimentado por um parser universal (`RSSParser`) e uma fábrica (`resolve_provider_for_source`).
+- **Escolha**: `RSSProvider` genérico configurável instanciado dinamicamente via metadados da tabela `sources`.
+- **Justificativa**: Feeds RSS 2.0 e Atom 1.0 seguem especificações XML padrão. Variações como `<media:content>`, `<enclosure>` e `<content:encoded>` são resolvidas pelo parser com estratégias de fallback em cascata.
+- **Consequência**: Novas fontes RSS podem ser adicionadas simplesmente cadastrando uma linha no banco de dados, sem alteração de código Python ou deploys adicionais.
+
+### ADR 07: Canonicalização de URLs e Deduplicação Determinística
+- **Problema**: Feeds RSS frequentemente adicionam parâmetros de rastreamento de campanhas (`utm_source`, `utm_medium`, `fbclid`, etc.) que alteram a URL textual de um mesmo artigo a cada coleta.
+- **Alternativas**:
+  1. Deduplicar estritamente pela URL bruta recebida do feed.
+  2. Canonicalizar a URL removendo parâmetros de rastreamento e normalizando host/caminho (`canonicalize_url`).
+- **Escolha**: Canonicalização determinística de URLs armazenada na coluna dedicada `canonical_url` com índice de busca e verificação dupla na ingestão: `(source_id, external_id)` OU `(source_id, canonical_url)`.
+- **Justificativa**: Garante que o mesmo artigo publicado com diferentes parâmetros de rastreamento seja reconhecido como a mesma entidade, evitando proliferação de duplicatas.
+
+### ADR 08: Sanitização de Conteúdo e Defesa em Profundidade contra XSS
+- **Problema**: Resumos de feeds RSS externos contêm fragmentos HTML crus que podem carregar tags maliciosas (`<script>`, `<iframe>`, handlers `onerror`), estilos quebrados ou rastreadores invisíveis (pixels 1x1).
+- **Alternativas**:
+  1. Salvar o HTML cru e delegar sanitização ao frontend.
+  2. Sanitizar no backend via `BeautifulSoup` na ingestão antes da persistência, e também renderizar de forma segura no frontend.
+- **Escolha**: Defesa em profundidade: sanitização rigorosa no backend na ingestão (`sanitize_text`), decodificação de entidades HTML, remoção de tags de risco, preservação de texto legível e extração segura de imagens candidatas válidas ignorando tracking pixels.
+- **Justificativa**: O banco de dados armazena dados limpos e seguros, tornando as APIs protegidas independentemente de qual cliente as consuma (web, mobile, CLI).
+
+### ADR 09: Concorrência e Resiliência no Agendador de Coleta
+- **Problema**: À medida que o número de fontes aumenta (8+ fontes), coletas sequenciais demoram excessivamente, e coletas concorrentes irrestritas podem exaurir conexões ou causar bloqueios por rate-limiting dos servidores remotos.
+- **Alternativas**:
+  1. Coleta sequencial em loop simples.
+  2. Coleta totalmente concorrente com `asyncio.gather(*tasks)` sem limite.
+  3. Coleta concorrente controlada com `asyncio.Semaphore` e intervalo individual por fonte (`poll_interval_minutes`).
+- **Escolha**: Concorrência limitada via `asyncio.Semaphore(MAX_CONCURRENT_SOURCES=4)` combinada com checagem de intervalo por fonte (`is_source_due_for_polling`) e registro de saúde no banco (`last_polled_at`, `last_success_at`, `last_error_at`, `last_error_message`).
+- **Justificativa**: Evita gargalos de I/O, distribui requisições de forma respeitosa para com os servidores de notícias e mantém total visibilidade operacional sobre o status de cada fonte.
+
 ---
 
 ## 4. Segurança e Resiliência
 
 1. **Proteção contra SSRF e Timeout de Rede**:
-   - Requisições HTTP externas usam `httpx.AsyncClient` com timeout estrito (10s–15s).
+   - Requisições HTTP externas usam `httpx.AsyncClient` centralizado (`create_http_client`) com timeout estrito configurável (padrão 15s) e User-Agent identificável: `TechNewsHub/1.0 (+https://github.com/usuario/tech-news-hub; RSS Reader)`.
    - Não são executadas requisições a URLs arbitrárias enviadas por usuários. Feeds são pré-cadastrados ou validados administrativamente.
-2. **Sanitização de Conteúdo**:
-   - Todo conteúdo textual recebido de fontes externas é tratado como dado não confiável.
-   - Resumos e títulos não são interpretados como HTML direto no frontend (não utilização de `dangerouslySetInnerHTML` com conteúdo não sanitizado).
+2. **Sanitização de Conteúdo e XSS**:
+   - Todo conteúdo textual recebido de fontes externas é sanitizado na ingestão.
+   - Resumos e títulos são renderizados de forma segura no frontend com escape por padrão.
 3. **CORS e Validação**:
    - Configuração de origens CORS explícitas via variável de ambiente `CORS_ORIGINS`.
-   - Validação de contratos via esquemas Pydantic v2 com `strict` e `model_validate`.
+   - Validação de contratos via esquemas Pydantic v2 com tipagem estrita e serialização JSON padronizada.

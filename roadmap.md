@@ -17,16 +17,20 @@ Este roadmap delineia a evolução planejada para o agregador inteligente e self
 
 ---
 
-## Fase 2 — Aggregation MVP (Vertical Slice Inicial)
+## Fase 2 — Aggregation MVP & Multi-Source Engine (Concluída)
 - [x] Abstração de `SourceProvider` (`fetch`, `normalize`, `validate`)
 - [x] Provedor oficial da API do Hacker News (Top Stories / Best Stories com métricas)
-- [x] Pipeline de normalização padronizado
-- [x] Persistência com deduplicação por `(source_id, external_id)` e preservação de métricas
-- [x] Worker independente com agendador de coletas periódicas e isolamento contra falhas
+- [x] Provedor genérico para feeds RSS/Atom (`RSSProvider`, `RSSParser`) com suporte a RSS 2.0 e Atom 1.0
+- [x] Integração de 8 fontes tecnológicas oficiais: Hacker News, Ars Technica, The Verge, Tom's Hardware, MIT Technology Review, IEEE Spectrum, GitHub Blog, Phoronix
+- [x] Canonicalização de URLs (remoção determinística de parâmetros de rastreamento UTM, ref, etc.)
+- [x] Sanitização rigorosa de texto e HTML contra XSS (`<script>`, `<iframe>`, handlers inline)
+- [x] Extração inteligente de imagens em miniatura (tags `media:content`, `media:thumbnail`, enclosures e tags `<img>` HTML)
+- [x] Persistência com deduplicação robusta por `(source_id, external_id)` e `(source_id, canonical_url)`
+- [x] Worker assíncrono com concorrência controlada (`asyncio.Semaphore`), fail-safe por fonte e rastreamento de saúde (`last_polled_at`, `last_success_at`, `last_error_at`)
+- [x] CLI de gerenciamento para sincronização manual (`python -m app.cli sync [--no-force]`) e seed (`python -m app.cli seed`)
 - [x] Endpoints REST: `/api/v1/articles`, `/api/v1/articles/{id}`, `/api/v1/sources`, `/api/v1/categories`
-- [x] Paginação e filtros por fonte, categoria, período e busca por título
-- [x] Frontend com Dashboard/Timeline moderna em dark mode
-- [ ] Provedor genérico para feeds RSS/Atom (Ars Technica, MIT Tech Review, IEEE Spectrum, Tom's Hardware)
+- [x] Paginação e filtros por fonte, categoria, período e busca por título e resumo
+- [x] Frontend moderno Next.js com timeline multi-fonte, badges visuais por publicação, modais de leitura enriquecidos, sincronização de estado com URL e dark mode por padrão
 
 ---
 
