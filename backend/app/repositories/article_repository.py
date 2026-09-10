@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -40,6 +40,20 @@ class ArticleRepository:
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
+    async def get_by_source_and_canonical_url(
+        self, source_id: int, canonical_url: str
+    ) -> Article | None:
+        stmt = (
+            select(Article)
+            .where(Article.source_id == source_id, Article.canonical_url == canonical_url)
+            .options(
+                selectinload(Article.source),
+                selectinload(Article.metrics),
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
     def _build_filter_stmt(
         self,
         stmt,
@@ -54,7 +68,13 @@ class ArticleRepository:
         if category and category.lower() != "all":
             stmt = stmt.where(Article.category == category.lower())
         if search:
-            stmt = stmt.where(Article.title.ilike(f"%{search}%"))
+            search_pattern = f"%{search.strip()}%"
+            stmt = stmt.where(
+                or_(
+                    Article.title.ilike(search_pattern),
+                    Article.summary.ilike(search_pattern),
+                )
+            )
         if from_date:
             stmt = stmt.where(Article.published_at >= from_date)
         if to_date:
@@ -136,7 +156,6 @@ class ArticleRepository:
         stmt = select(distinct(Article.category)).order_by(Article.category.asc())
         result = await self.db.execute(stmt)
         categories = list(result.scalars().all())
-        # Default predefined categories for navigation if empty
         defaults = [
             "ai",
             "hardware",
@@ -147,6 +166,7 @@ class ArticleRepository:
             "science",
             "startups",
             "games",
+            "technology",
         ]
         all_cats = sorted(set(defaults + [c for c in categories if c]))
         return all_cats

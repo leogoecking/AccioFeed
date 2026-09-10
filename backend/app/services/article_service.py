@@ -7,6 +7,7 @@ from app.models.article import Article
 from app.models.base import utc_now
 from app.repositories.article_repository import ArticleRepository
 from app.sources.base import NormalizedArticle
+from app.sources.url_utils import canonicalize_url
 
 
 class ArticleService:
@@ -56,15 +57,27 @@ class ArticleService:
         normalized: NormalizedArticle,
     ) -> tuple[Article, bool]:
         """
-        Deduplicates by (source_id, external_id).
+        Deduplicates by:
+        1. (source_id, external_id)
+        2. (source_id, canonical_url)
         If already present: updates metrics if changed.
         If new: creates article and initial metric.
         Returns (article, was_created).
         """
+        canonical_link = canonicalize_url(normalized.url)
+
+        # 1. Check external_id
         existing = await self.repo.get_by_source_and_external_id(
             source_id=source_id,
             external_id=normalized.external_id,
         )
+
+        # 2. Check canonical_url if not found by external_id
+        if not existing and canonical_link:
+            existing = await self.repo.get_by_source_and_canonical_url(
+                source_id=source_id,
+                canonical_url=canonical_link,
+            )
 
         if existing:
             # Check if metrics updated
@@ -95,6 +108,7 @@ class ArticleService:
             external_id=normalized.external_id,
             title=normalized.title,
             url=normalized.url,
+            canonical_url=canonical_link,
             author=normalized.author,
             summary=normalized.summary,
             content=normalized.content,

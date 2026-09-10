@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,10 +39,22 @@ class SourceRepository:
         type: str,
         base_url: str,
         feed_url: str | None = None,
+        default_category: str = "technology",
+        poll_interval_minutes: int = 15,
         is_active: bool = True,
     ) -> Source:
         existing = await self.get_by_slug(slug)
         if existing:
+            # Update attributes if needed
+            existing.name = name
+            existing.type = type
+            existing.base_url = base_url
+            existing.feed_url = feed_url
+            existing.default_category = default_category
+            existing.poll_interval_minutes = poll_interval_minutes
+            existing.is_active = is_active
+            await self.db.commit()
+            await self.db.refresh(existing)
             return existing
 
         source = Source(
@@ -49,6 +63,29 @@ class SourceRepository:
             type=type,
             base_url=base_url,
             feed_url=feed_url,
+            default_category=default_category,
+            poll_interval_minutes=poll_interval_minutes,
             is_active=is_active,
         )
         return await self.create(source)
+
+    async def record_poll_result(
+        self,
+        source_id: int,
+        success: bool,
+        error_message: str | None = None,
+    ) -> None:
+        source = await self.get_by_id(source_id)
+        if not source:
+            return
+
+        now = datetime.now(UTC)
+        source.last_polled_at = now
+        if success:
+            source.last_success_at = now
+            source.last_error_message = None
+        else:
+            source.last_error_at = now
+            source.last_error_message = error_message[:500] if error_message else None
+
+        await self.db.commit()

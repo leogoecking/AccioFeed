@@ -11,6 +11,7 @@ from app.schemas.source import SourcePublic, SourceSimple
 class ArticleBase(BaseModel):
     title: str = Field(..., max_length=500)
     url: str = Field(..., max_length=2000)
+    canonical_url: str | None = Field(default=None, max_length=2000)
     author: str | None = Field(default=None, max_length=255)
     summary: str | None = None
     content: str | None = None
@@ -30,6 +31,7 @@ class ArticlePublic(BaseModel):
     id: uuid.UUID
     title: str
     url: str
+    canonical_url: str | None = None
     source: SourceSimple
     author: str | None = None
     summary: str | None = None
@@ -60,6 +62,7 @@ class ArticlePublic(BaseModel):
                 "id": data.id,
                 "title": data.title,
                 "url": data.url,
+                "canonical_url": getattr(data, "canonical_url", data.url),
                 "source": data.source,
                 "author": getattr(data, "author", None),
                 "summary": getattr(data, "summary", None),

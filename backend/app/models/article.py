@@ -38,6 +38,7 @@ class Article(Base, TimestampMixin):
     external_id: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(500), index=True, nullable=False)
     url: Mapped[str] = mapped_column(String(2000), index=True, nullable=False)
+    canonical_url: Mapped[str] = mapped_column(String(2000), index=True, nullable=False)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -77,4 +78,5 @@ class Article(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("source_id", "external_id", name="uq_source_external_id"),
         Index("ix_articles_published_category", "published_at", "category"),
+        Index("ix_articles_source_canonical_url", "source_id", "canonical_url"),
     )
