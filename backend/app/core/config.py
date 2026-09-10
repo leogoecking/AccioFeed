@@ -28,14 +28,14 @@ class Settings(BaseSettings):
         return str(v)
 
     # CORS
-    CORS_ORIGINS: list[str] = [
+    CORS_ORIGINS: str | list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
     ]
 
-    @field_validator("CORS_ORIGINS", mode="before")
+    @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
         if isinstance(v, str):

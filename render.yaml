@@ -30,7 +30,7 @@ services:
       - key: DEBUG
         value: "false"
       - key: CORS_ORIGINS
-        value: "*"
+        value: '["*"]'
       - key: TRANSLATION_ENABLED
         value: "true"
       - key: TRANSLATION_PROVIDER
