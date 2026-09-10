@@ -31,6 +31,12 @@ def test_is_text_already_portuguese():
     assert not BaseTranslationProvider.is_text_already_portuguese(
         "Linux kernel 6.14 improves performance on AMD and Intel processors"
     )
+    assert not BaseTranslationProvider.is_text_already_portuguese(
+        "GitHub.com launches new CLI tool for developers"
+    )
+    assert not BaseTranslationProvider.is_text_already_portuguese(
+        "Amazon.com reports high revenue growth in cloud division"
+    )
 
 
 @pytest.mark.asyncio

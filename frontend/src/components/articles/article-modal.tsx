@@ -49,12 +49,14 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
   const [translationError, setTranslationError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     setImageError(false);
     setLanguageMode("original");
     setTranslation(null);
     setTranslationError(null);
 
     if (article) {
+      const currentId = article.id;
       setLocalState(article.state || {
         is_read: false,
         is_favorite: false,
@@ -63,16 +65,16 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
       });
 
       // Automatically record opening in background (marks read, records timestamps)
-      recordArticleOpened(article.id).then((updated) => {
-        if (updated?.state) {
+      recordArticleOpened(currentId).then((updated) => {
+        if (isMounted && updated?.state) {
           setLocalState(updated.state);
-          onStateChange?.(article.id, updated.state);
+          onStateChange?.(currentId, updated.state);
         }
       });
 
       // Check if translation already exists in cache
-      fetchArticleTranslation(article.id, "pt-BR").then((cached) => {
-        if (cached) {
+      fetchArticleTranslation(currentId, "pt-BR").then((cached) => {
+        if (isMounted && cached) {
           setTranslation(cached);
         }
       });
@@ -87,6 +89,7 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
       window.addEventListener("keydown", handleKeyDown);
     }
     return () => {
+      isMounted = false;
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -138,26 +141,37 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
       setLanguageMode("pt-br");
       return;
     }
+    const currentId = article.id;
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      const res = await translateArticle(article.id, "pt-BR");
-      setTranslation(res);
-      setLanguageMode("pt-br");
+      const res = await translateArticle(currentId, "pt-BR");
+      if (article.id === currentId) {
+        setTranslation(res);
+        setLanguageMode("pt-br");
+      }
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original.";
-      setTranslationError(msg);
+      if (article.id === currentId) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original.";
+        setTranslationError(msg);
+      }
     } finally {
-      setIsTranslating(false);
+      if (article.id === currentId) {
+        setIsTranslating(false);
+      }
     }
   };
 
   const isPtActive = languageMode === "pt-br" && Boolean(translation);
   const displayTitle = isPtActive ? translation!.translated_title : article.title;
-  const displaySummary = isPtActive && translation?.translated_summary ? translation.translated_summary : article.summary;
+  const originalBody = article.summary || article.content;
+  const translatedBody = isPtActive
+    ? translation?.translated_summary || translation?.translated_content
+    : null;
+  const displayBody = isPtActive && translatedBody ? translatedBody : originalBody;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
@@ -364,8 +378,8 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
         {/* Summary or Content */}
         <div className="space-y-4">
           <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed">
-            {displaySummary ? (
-              <p className="whitespace-pre-line leading-relaxed">{displaySummary}</p>
+            {displayBody ? (
+              <p className="whitespace-pre-line leading-relaxed">{displayBody}</p>
             ) : (
               <p className="italic text-slate-500">
                 Esta fonte disponibiliza a matéria e discussão diretamente no link original externo.

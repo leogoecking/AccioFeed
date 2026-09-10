@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.sources.sanitizer import sanitize_text
 from app.translation.base import (
     ArticleTranslationResult,
     BaseTranslationProvider,
@@ -220,10 +221,21 @@ class DeepLProvider(BaseTranslationProvider):
         """Translate article fields efficiently in a single batch request."""
         target_lang = self._normalize_target_language(target_language)
 
-        # 1. Check if title is already in target language (Portuguese)
-        if target_lang == "PT-BR" and self.is_text_already_portuguese(title):
+        # 1. Clean title and check if already Portuguese
+        cleaned_title = title.strip() if title else ""
+        if not cleaned_title:
             return ArticleTranslationResult(
                 translated_title=title,
+                translated_summary=summary,
+                translated_content=content,
+                detected_source_language=source_language,
+                target_language=target_lang,
+                provider=self.provider_name,
+            )
+
+        if target_lang == "PT-BR" and self.is_text_already_portuguese(cleaned_title):
+            return ArticleTranslationResult(
+                translated_title=cleaned_title,
                 translated_summary=summary,
                 translated_content=content,
                 detected_source_language="PT",
@@ -232,15 +244,16 @@ class DeepLProvider(BaseTranslationProvider):
             )
 
         # 2. Build list of texts to translate in one batch
-        texts_to_translate: list[str] = [title]
+        texts_to_translate: list[str] = [cleaned_title]
         has_summary = bool(summary and summary.strip())
         if has_summary and summary is not None:
-            texts_to_translate.append(summary)
+            texts_to_translate.append(summary.strip())
 
-        # 3. Handle content: for safety and length limits, translate content if text is reasonable
-        has_content = bool(content and content.strip())
-        if has_content and content is not None and len(content) <= 5000:
-            texts_to_translate.append(content)
+        # 3. Handle content: sanitize and limit length for safety and clean markup
+        clean_content = sanitize_text(content, max_length=5000) if content else None
+        has_content = bool(clean_content and clean_content.strip())
+        if has_content and clean_content is not None:
+            texts_to_translate.append(clean_content.strip())
         else:
             has_content = False
 

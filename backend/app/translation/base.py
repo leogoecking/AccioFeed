@@ -87,11 +87,9 @@ class BaseTranslationProvider(ABC):
         "pelos",
         "pelas",
         "uma",
-        "com",
         "está",
         "estão",
         "também",
-        "entre",
         "quando",
         "muito",
         "anos",
@@ -106,6 +104,12 @@ class BaseTranslationProvider(ABC):
         "anuncia",
         "brasileiro",
         "brasil",
+        "usuário",
+        "usuários",
+        "segurança",
+        "inteligência",
+        "versão",
+        "atualização",
     }
 
     @property

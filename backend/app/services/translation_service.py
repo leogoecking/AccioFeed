@@ -24,6 +24,12 @@ _locks_guard = asyncio.Lock()
 async def _get_lock(key: str) -> asyncio.Lock:
     async with _locks_guard:
         if key not in _translation_locks:
+            if len(_translation_locks) > 500:
+                unlocked_keys = [
+                    k for k, item_lock in _translation_locks.items() if not item_lock.locked()
+                ]
+                for k in unlocked_keys:
+                    del _translation_locks[k]
             _translation_locks[key] = asyncio.Lock()
         return _translation_locks[key]
 
