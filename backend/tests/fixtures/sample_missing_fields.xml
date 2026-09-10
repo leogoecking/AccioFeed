@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Minimal Feed</title>
+    <link>https://minimal.example.com</link>
+    <item>
+      <title>Article With Missing Optional Fields</title>
+      <link>https://minimal.example.com/item/42</link>
+      <!-- No guid, no author, no description/summary, invalid pubDate -->
+      <pubDate>invalid-date-string-that-fails-parsing</pubDate>
+    </item>
+  </channel>
+</rss>

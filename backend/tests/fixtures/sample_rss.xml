@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Tech Insights Feed</title>
+    <link>https://techinsights.example.com</link>
+    <description>Latest technology insights and breakthroughs</description>
+    <item>
+      <title>Next-Gen Quantum Processors Unveiled</title>
+      <link>https://techinsights.example.com/articles/quantum-processors-2026?utm_source=rss&amp;utm_medium=feed</link>
+      <guid isPermaLink="false">tech-guid-1001</guid>
+      <pubDate>Mon, 08 Sep 2026 14:30:00 GMT</pubDate>
+      <dc:creator>Dr. Ada Lovelace</dc:creator>
+      <description><![CDATA[Researchers have demonstrated a scalable 5000-qubit processor with reduced decoherence rates.]]></description>
+      <category>hardware</category>
+      <media:content url="https://techinsights.example.com/images/quantum.jpg" medium="image" type="image/jpeg" />
+    </item>
+  </channel>
+</rss>

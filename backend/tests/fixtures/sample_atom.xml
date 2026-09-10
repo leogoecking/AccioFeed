@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Open Engineering Journal</title>
+  <link href="https://engineering.example.com"/>
+  <updated>2026-09-08T18:00:00Z</updated>
+  <id>urn:uuid:60a76c80-d399-11d9-b93C-0003939e0af6</id>
+  <entry>
+    <title>Building Distributed Workflows in Rust</title>
+    <link href="https://engineering.example.com/posts/rust-workflows?utm_campaign=social&amp;id=99"/>
+    <id>urn:entry:engineering:2026:rust-workflows</id>
+    <updated>2026-09-08T17:45:00Z</updated>
+    <summary>A deep dive into building async actors with memory safety in Rust 1.85.</summary>
+    <author>
+      <name>Linus Tech</name>
+    </author>
+    <category term="dev"/>
+  </entry>
+</feed>

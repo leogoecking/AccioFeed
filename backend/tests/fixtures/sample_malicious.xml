@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Potentially Malicious Feed</title>
+    <link>https://evil.example.com</link>
+    <item>
+      <title>Innocent Looking News <script>alert("XSS")</script></title>
+      <link>https://evil.example.com/attack?utm_source=rss</link>
+      <guid>attack-1</guid>
+      <description><![CDATA[
+        Normal opening paragraph.
+        <script type="text/javascript">window.location="http://attacker.com"</script>
+        <iframe src="http://malicious.example.com/steal-cookie"></iframe>
+        <object data="bad.swf"></object>
+        <img src="https://evil.example.com/pixel.png" onerror="alert('pwned')" />
+        <a href="javascript:alert(1)">Click here</a>
+      ]]></description>
+      <pubDate>Mon, 08 Sep 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
