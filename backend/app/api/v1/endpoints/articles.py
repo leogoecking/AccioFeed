@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.article import ArticleDetail, ArticlePublic
+from app.schemas.article_state import ArticleStateUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.article_service import ArticleService
 
@@ -17,12 +18,19 @@ router = APIRouter(prefix="/articles", tags=["Articles"])
 async def get_articles(
     source: str | None = Query(None, description="Source slug (e.g. hacker-news)"),
     category: str | None = Query(None, description="Category slug"),
-    search: str | None = Query(None, description="Search term in title"),
+    state: str | None = Query(
+        None,
+        pattern="^(all|unread|favorite|saved|hidden|history)$",
+        description="Filter by personal state collection",
+    ),
+    search: str | None = Query(None, description="Search term in title or summary"),
     from_date: datetime | None = Query(
         None, alias="from", description="From published datetime (ISO)"
     ),
     to_date: datetime | None = Query(None, alias="to", description="To published datetime (ISO)"),
-    sort: str = Query("recent", pattern="^(recent|popular)$", description="Sort order"),
+    sort: str = Query(
+        "recent", pattern="^(recent|popular|history|last_opened)$", description="Sort order"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
@@ -37,6 +45,7 @@ async def get_articles(
         sort=sort,
         page=page,
         page_size=page_size,
+        state_filter=state,
     )
 
     pages = math.ceil(total / page_size) if total > 0 else 1
@@ -57,6 +66,43 @@ async def get_article_by_id(
 ):
     service = ArticleService(db)
     article = await service.get_article(article_id)
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+    return ArticleDetail.model_validate(article)
+
+
+@router.patch("/{article_id}/state", response_model=ArticlePublic)
+async def update_article_state(
+    article_id: uuid.UUID,
+    payload: ArticleStateUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    service = ArticleService(db)
+    article = await service.update_article_state(
+        article_id=article_id,
+        is_read=payload.is_read,
+        is_favorite=payload.is_favorite,
+        is_saved=payload.is_saved,
+        is_hidden=payload.is_hidden,
+    )
+    if not article:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Article not found",
+        )
+    return ArticlePublic.model_validate(article)
+
+
+@router.post("/{article_id}/open", response_model=ArticleDetail)
+async def open_article(
+    article_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    service = ArticleService(db)
+    article = await service.record_article_opened(article_id)
     if not article:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

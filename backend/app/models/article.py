@@ -18,6 +18,7 @@ from app.models.base import Base, TimestampMixin, utc_now
 
 if TYPE_CHECKING:
     from app.models.article_metric import ArticleMetric
+    from app.models.article_state import ArticleState
     from app.models.source import Source
 
 
@@ -73,6 +74,13 @@ class Article(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="desc(ArticleMetric.captured_at)",
         lazy="selectin",
+    )
+    state: Mapped["ArticleState | None"] = relationship(
+        "ArticleState",
+        back_populates="article",
+        cascade="all, delete-orphan",
+        uselist=False,
+        lazy="joined",
     )
 
     __table_args__ = (

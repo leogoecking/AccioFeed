@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.article import Article
 from app.models.base import utc_now
 from app.repositories.article_repository import ArticleRepository
+from app.repositories.article_state_repository import ArticleStateRepository
 from app.sources.base import NormalizedArticle
 from app.sources.url_utils import canonicalize_url
 
@@ -14,6 +15,7 @@ class ArticleService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = ArticleRepository(db)
+        self.state_repo = ArticleStateRepository(db)
 
     async def get_article(self, article_id: uuid.UUID) -> Article | None:
         return await self.repo.get_by_id(article_id)
@@ -28,6 +30,7 @@ class ArticleService:
         sort: str = "recent",
         page: int = 1,
         page_size: int = 20,
+        state_filter: str | None = None,
     ) -> tuple[list[Article], int]:
         total = await self.repo.count_articles(
             source_slug=source_slug,
@@ -35,6 +38,7 @@ class ArticleService:
             search=search,
             from_date=from_date,
             to_date=to_date,
+            state_filter=state_filter,
         )
         items = await self.repo.list_articles(
             source_slug=source_slug,
@@ -45,8 +49,41 @@ class ArticleService:
             sort=sort,
             page=page,
             page_size=page_size,
+            state_filter=state_filter,
         )
         return items, total
+
+    async def update_article_state(
+        self,
+        article_id: uuid.UUID,
+        is_read: bool | None = None,
+        is_favorite: bool | None = None,
+        is_saved: bool | None = None,
+        is_hidden: bool | None = None,
+    ) -> Article | None:
+        article = await self.repo.get_by_id(article_id)
+        if not article:
+            return None
+        state = await self.state_repo.update_state(
+            article_id=article_id,
+            is_read=is_read,
+            is_favorite=is_favorite,
+            is_saved=is_saved,
+            is_hidden=is_hidden,
+        )
+        article.state = state
+        return article
+
+    async def record_article_opened(self, article_id: uuid.UUID) -> Article | None:
+        article = await self.repo.get_by_id(article_id)
+        if not article:
+            return None
+        state = await self.state_repo.record_opened(article_id)
+        article.state = state
+        return article
+
+    async def get_library_stats(self) -> dict[str, int]:
+        return await self.state_repo.get_library_stats()
 
     async def list_categories(self) -> list[str]:
         return await self.repo.list_categories()
