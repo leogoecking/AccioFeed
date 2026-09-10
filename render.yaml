@@ -57,6 +57,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: INTERNAL_API_URL
+        fromService:
+          type: web
+          name: technewshub-api
+          property: host
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web

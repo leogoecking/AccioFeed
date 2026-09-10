@@ -210,8 +210,8 @@ export function Timeline({
         <div className="rounded-2xl border border-rose-900/50 bg-rose-950/20 p-8 text-center space-y-3">
           <AlertCircle className="mx-auto h-8 w-8 text-rose-400" />
           <p className="text-slate-200 font-medium">Não foi possível carregar as notícias.</p>
-          <p className="text-xs text-slate-400">
-            Verifique se a API backend está em execução ou tente recarregar.
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            O servidor backend pode estar iniciando (cold start no Render leva cerca de 40s). Aguarde alguns segundos e tente novamente.
           </p>
           <button
             onClick={loadData}

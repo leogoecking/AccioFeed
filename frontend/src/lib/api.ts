@@ -11,11 +11,29 @@ import {
   SyncResponse,
 } from "./types";
 
-const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001").trim();
-const API_BASE =
-  rawApiUrl.startsWith("http://") || rawApiUrl.startsWith("https://")
-    ? rawApiUrl
-    : `https://${rawApiUrl}`;
+function getApiBase(): string {
+  if (typeof window !== "undefined") {
+    const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+    // Only use direct absolute URL if explicitly configured as a public https URL
+    if (raw && raw.startsWith("https://") && raw.includes(".") && !raw.includes("localhost")) {
+      return raw.replace(/\/+$/, "");
+    }
+    // In browser, default to same-origin relative URL proxied by Next.js route handler
+    return "";
+  }
+
+  const serverRaw = (
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8001"
+  ).trim();
+  if (serverRaw.startsWith("http://") || serverRaw.startsWith("https://")) {
+    return serverRaw.replace(/\/+$/, "");
+  }
+  return `http://${serverRaw}`.replace(/\/+$/, "");
+}
+
+const API_BASE = getApiBase();
 
 export async function fetchArticles(filters: ArticleFilters = {}): Promise<PaginatedResponse<ArticlePublic>> {
   const params = new URLSearchParams();
