@@ -12,6 +12,11 @@ def main():
         help="Run collection cycle once and exit",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force poll all sources ignoring poll intervals",
+    )
+    parser.add_argument(
         "--interval",
         type=int,
         default=None,
@@ -20,7 +25,7 @@ def main():
     args = parser.parse_args()
 
     scheduler = IngestionScheduler(interval_seconds=args.interval)
-    asyncio.run(scheduler.start(run_once=args.run_once))
+    asyncio.run(scheduler.start(run_once=args.run_once, force=args.force))
 
 
 if __name__ == "__main__":
