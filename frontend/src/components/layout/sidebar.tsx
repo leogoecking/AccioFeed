@@ -10,10 +10,11 @@ import {
   Newspaper,
   Rocket,
   Shield,
+  Sparkles,
   Terminal,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { SourcePublic } from "@/lib/types";
+import { cn, getSourceBadge } from "@/lib/utils";
 
 interface SidebarProps {
   activeCategory: string;
@@ -31,6 +32,7 @@ const CATEGORIES = [
   { id: "linux", label: "Linux", icon: Terminal },
   { id: "opensource", label: "Open Source", icon: Globe },
   { id: "cybersecurity", label: "Cybersecurity", icon: Shield },
+  { id: "technology", label: "Tecnologia", icon: Sparkles },
   { id: "science", label: "Ciência", icon: Flame },
   { id: "startups", label: "Startups", icon: Rocket },
 ];
@@ -64,7 +66,9 @@ export function Sidebar({
                     : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
                 )}
               >
-                <Icon className={cn("h-4 w-4", isActive ? "text-cyan-400" : "text-slate-500")} />
+                <Icon
+                  className={cn("h-4 w-4", isActive ? "text-cyan-400" : "text-slate-500")}
+                />
                 <span>{cat.label}</span>
               </button>
             );
@@ -95,6 +99,7 @@ export function Sidebar({
 
           {sources.map((source) => {
             const isActive = activeSource === source.slug;
+            const badgeMeta = getSourceBadge(source.slug);
             return (
               <button
                 key={source.id}
@@ -107,11 +112,21 @@ export function Sidebar({
                 )}
               >
                 <div className="flex items-center gap-3 truncate">
-                  <Newspaper className={cn("h-4 w-4 shrink-0", isActive ? "text-cyan-400" : "text-slate-500")} />
+                  <Newspaper
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      isActive ? "text-cyan-400" : "text-slate-500"
+                    )}
+                  />
                   <span className="truncate">{source.name}</span>
                 </div>
-                <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
-                  {source.type.toUpperCase()}
+                <span
+                  className={cn(
+                    "rounded border px-1.5 py-0.2 text-[10px] font-mono",
+                    badgeMeta.badgeClass
+                  )}
+                >
+                  {source.type === "hacker_news" ? "API" : "RSS"}
                 </span>
               </button>
             );

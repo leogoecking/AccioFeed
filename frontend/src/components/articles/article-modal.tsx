@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
-import { ExternalLink, MessageSquare, ThumbsUp, X, User, Calendar, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Calendar,
+  ExternalLink,
+  MessageSquare,
+  Tag,
+  ThumbsUp,
+  User,
+  X,
+} from "lucide-react";
 import { ArticlePublic } from "@/lib/types";
-import { getCategoryBadge } from "@/lib/utils";
+import { getCategoryBadge, getSourceBadge } from "@/lib/utils";
 
 interface ArticleModalProps {
   article: ArticlePublic | null;
@@ -11,7 +19,10 @@ interface ArticleModalProps {
 }
 
 export function ArticleModal({ article, onClose }: ArticleModalProps) {
+  const [imageError, setImageError] = useState(false);
+
   useEffect(() => {
+    setImageError(false);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -28,6 +39,7 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
   if (!article) return null;
 
   const categoryMeta = getCategoryBadge(article.category);
+  const sourceMeta = getSourceBadge(article.source.slug);
   const formattedDate = new Date(article.published_at).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "long",
@@ -36,8 +48,10 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
     minute: "2-digit",
   });
 
+  const hasValidImage = Boolean(article.image_url && !imageError);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl p-6 sm:p-8 space-y-6">
         {/* Close Button */}
         <button
@@ -49,10 +63,14 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
 
         {/* Badges Header */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-300">
+          <span
+            className={`rounded-md border px-2.5 py-1 text-xs font-medium ${sourceMeta.badgeClass}`}
+          >
             {article.source.name}
           </span>
-          <span className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium ${categoryMeta.className}`}>
+          <span
+            className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium ${categoryMeta.className}`}
+          >
             <Tag className="h-3 w-3" />
             {categoryMeta.label}
           </span>
@@ -62,6 +80,19 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
         <h2 className="text-xl sm:text-2xl font-bold text-slate-100 leading-snug">
           {article.title}
         </h2>
+
+        {/* Cover Image if available */}
+        {hasValidImage && (
+          <div className="overflow-hidden rounded-xl bg-slate-950 max-h-72">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={article.image_url!}
+              alt={article.title}
+              onError={() => setImageError(true)}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        )}
 
         {/* Metadata bar */}
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 border-y border-slate-800/80 py-3">
@@ -91,14 +122,22 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
         </div>
 
         {/* Summary or Content */}
-        <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed">
-          {article.summary ? (
-            <p className="whitespace-pre-line">{article.summary}</p>
-          ) : (
-            <p className="italic text-slate-500">
-              Esta fonte disponibiliza a íntegra da discussão e do artigo no link original externo.
-            </p>
-          )}
+        <div className="space-y-4">
+          <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed">
+            {article.summary ? (
+              <p className="whitespace-pre-line">{article.summary}</p>
+            ) : (
+              <p className="italic text-slate-500">
+                Esta fonte disponibiliza a matéria e discussão diretamente no link original externo.
+              </p>
+            )}
+          </div>
+
+          {/* Legal / Source notice */}
+          <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 text-xs text-slate-500 flex items-center justify-between">
+            <span>Conteúdo completo disponível na fonte original.</span>
+            <span className="font-mono text-[10px] text-slate-600">Direitos reservados à publicação</span>
+          </div>
         </div>
 
         {/* Footer Actions */}
@@ -115,7 +154,7 @@ export function ArticleModal({ article, onClose }: ArticleModalProps) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-semibold px-4 py-2 text-sm transition-all shadow-lg shadow-cyan-950"
           >
-            <span>Ver artigo original</span>
+            <span>Abrir artigo original</span>
             <ExternalLink className="h-4 w-4" />
           </a>
         </div>
