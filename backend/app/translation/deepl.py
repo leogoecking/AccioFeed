@@ -64,7 +64,8 @@ class DeepLProvider(BaseTranslationProvider):
     def _validate_configuration(self) -> None:
         if not self.api_key:
             raise TranslationConfigError(
-                "Chave de API do DeepL (TRANSLATION_API_KEY) não configurada."
+                "Chave de API do DeepL (TRANSLATION_API_KEY) não configurada. "
+                "Para traduzir sem chave externa, defina TRANSLATION_PROVIDER=mymemory no arquivo .env."
             )
 
     async def _post_with_retry(

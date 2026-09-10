@@ -227,3 +227,116 @@ def test_factory_deepl():
         provider = get_translation_provider()
         assert isinstance(provider, DeepLProvider)
         assert provider.provider_name == "deepl"
+
+
+def test_factory_mymemory():
+    with (
+        patch.object(settings, "TRANSLATION_ENABLED", True),
+        patch.object(settings, "TRANSLATION_PROVIDER", "mymemory"),
+    ):
+        from app.translation.mymemory import MyMemoryProvider
+
+        provider = get_translation_provider()
+        assert isinstance(provider, MyMemoryProvider)
+        assert provider.provider_name == "mymemory"
+
+
+def test_factory_mock():
+    with (
+        patch.object(settings, "TRANSLATION_ENABLED", True),
+        patch.object(settings, "TRANSLATION_PROVIDER", "mock"),
+    ):
+        from app.translation.mock import MockTranslationProvider
+
+        provider = get_translation_provider()
+        assert isinstance(provider, MockTranslationProvider)
+        assert provider.provider_name == "mock"
+
+
+def test_factory_auto_without_key():
+    with (
+        patch.object(settings, "TRANSLATION_ENABLED", True),
+        patch.object(settings, "TRANSLATION_PROVIDER", "auto"),
+        patch.object(settings, "TRANSLATION_API_KEY", ""),
+    ):
+        from app.translation.mymemory import MyMemoryProvider
+
+        provider = get_translation_provider()
+        assert isinstance(provider, MyMemoryProvider)
+
+
+def test_factory_auto_with_key():
+    with (
+        patch.object(settings, "TRANSLATION_ENABLED", True),
+        patch.object(settings, "TRANSLATION_PROVIDER", "auto"),
+        patch.object(settings, "TRANSLATION_API_KEY", "some-key:fx"),
+    ):
+        provider = get_translation_provider()
+        assert isinstance(provider, DeepLProvider)
+
+
+@pytest.mark.asyncio
+async def test_mymemory_translate_single_text_success():
+    from app.translation.mymemory import MyMemoryProvider
+
+    provider = MyMemoryProvider()
+    fake_data = {
+        "responseStatus": 200,
+        "responseData": {
+            "translatedText": "Olá mundo",
+            "match": 0.9,
+        },
+    }
+
+    mock_resp = httpx.Response(
+        status_code=200,
+        json=fake_data,
+        request=httpx.Request("GET", provider.api_url),
+    )
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        res = await provider.translate("Hello world", "pt-BR")
+        assert res.text == "Olá mundo"
+        assert res.target_language == "pt-BR"
+        assert res.provider == "mymemory"
+
+
+@pytest.mark.asyncio
+async def test_mymemory_quota_error():
+    from app.translation.mymemory import MyMemoryProvider
+
+    provider = MyMemoryProvider()
+    fake_data = {
+        "responseStatus": 429,
+        "quotaFinished": True,
+        "responseData": {},
+    }
+
+    mock_resp = httpx.Response(
+        status_code=200,
+        json=fake_data,
+        request=httpx.Request("GET", provider.api_url),
+    )
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        with pytest.raises(TranslationQuotaError, match="Cota diária"):
+            await provider.translate("Hello world", "pt-BR")
+
+
+@pytest.mark.asyncio
+async def test_mock_provider_translate():
+    from app.translation.mock import MockTranslationProvider
+
+    provider = MockTranslationProvider()
+    res = await provider.translate("Test title", "pt-BR")
+    assert res.text == "[PT] Test title"
+    assert res.provider == "mock"
+
+    article_res = await provider.translate_article(
+        title="Breaking News",
+        summary="Short summary",
+        content=None,
+        target_language="pt-BR",
+    )
+    assert article_res.translated_title == "[PT] Breaking News"
+    assert article_res.translated_summary == "[PT] Short summary"

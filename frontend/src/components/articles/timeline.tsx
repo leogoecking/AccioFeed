@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   AlertCircle,
   ArrowUpDown,
@@ -82,35 +82,48 @@ export function Timeline({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, activeCollection, activeSource, searchQuery, sort, page]);
 
-  const handleArticleStateChange = (articleId: string, newState: Partial<ArticleStatePublic>) => {
-    // Optimistically update article in state
-    setData((prev) => ({
-      ...prev,
-      items: prev.items.map((art) => {
-        if (art.id === articleId) {
-          const updatedState = { ...art.state, ...newState };
-          return { ...art, state: updatedState };
+  const handleArticleStateChange = useCallback(
+    (articleId: string, newState: Partial<ArticleStatePublic>) => {
+      // Optimistically update article in state
+      setData((prev) => ({
+        ...prev,
+        items: prev.items.map((art) => {
+          if (art.id === articleId) {
+            const updatedState = { ...art.state, ...newState };
+            return { ...art, state: updatedState };
+          }
+          return art;
+        }),
+      }));
+
+      setSelectedArticle((prev) => {
+        if (prev && prev.id === articleId) {
+          return { ...prev, state: { ...prev.state, ...newState } };
         }
-        return art;
-      }),
-    }));
+        return prev;
+      });
 
-    if (selectedArticle && selectedArticle.id === articleId) {
-      setSelectedArticle((prev) => (prev ? { ...prev, state: { ...prev.state, ...newState } } : null));
-    }
+      onStatsRefresh?.();
+    },
+    [onStatsRefresh]
+  );
 
-    onStatsRefresh?.();
-  };
+  const handleArticleHide = useCallback(
+    (articleId: string) => {
+      // Remove article immediately from timeline
+      setData((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        items: prev.items.filter((art) => art.id !== articleId),
+      }));
+      onStatsRefresh?.();
+    },
+    [onStatsRefresh]
+  );
 
-  const handleArticleHide = (articleId: string) => {
-    // Remove article immediately from timeline
-    setData((prev) => ({
-      ...prev,
-      total: Math.max(0, prev.total - 1),
-      items: prev.items.filter((art) => art.id !== articleId),
-    }));
-    onStatsRefresh?.();
-  };
+  const handleCloseModal = useCallback(() => {
+    setSelectedArticle(null);
+  }, []);
 
   const getHeading = () => {
     if (activeCollection === "unread") return "Não Lidos";
@@ -274,7 +287,7 @@ export function Timeline({
       {/* Article Reader Modal */}
       <ArticleModal
         article={selectedArticle}
-        onClose={() => setSelectedArticle(null)}
+        onClose={handleCloseModal}
         onStateChange={handleArticleStateChange}
         onHide={handleArticleHide}
       />

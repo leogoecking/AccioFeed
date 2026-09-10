@@ -87,12 +87,12 @@ class TranslationService:
                 raise ValueError("Artigo não encontrado.")
 
             # 3. Check if article is already in Portuguese
-            is_pt_source = article.language.lower() in (
-                "pt",
-                "pt-br",
-                "pt_br",
-                "por",
-            ) or BaseTranslationProvider.is_text_already_portuguese(article.title)
+            is_pt_lang = bool(
+                article.language and article.language.lower() in ("pt", "pt-br", "pt_br", "por")
+            )
+            is_pt_source = is_pt_lang or BaseTranslationProvider.is_text_already_portuguese(
+                article.title
+            )
 
             if norm_lang == "pt-BR" and is_pt_source:
                 logger.info(

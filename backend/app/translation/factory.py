@@ -5,6 +5,9 @@ from app.translation.base import (
     TranslationDisabledError,
 )
 from app.translation.deepl import DeepLProvider
+from app.translation.libretranslate import LibreTranslateProvider
+from app.translation.mock import MockTranslationProvider
+from app.translation.mymemory import MyMemoryProvider
 
 
 def get_translation_provider() -> BaseTranslationProvider:
@@ -23,6 +26,21 @@ def get_translation_provider() -> BaseTranslationProvider:
     if provider_name == "deepl":
         return DeepLProvider()
 
+    if provider_name in ("mymemory", "free"):
+        return MyMemoryProvider()
+
+    if provider_name in ("libretranslate", "libre"):
+        return LibreTranslateProvider()
+
+    if provider_name in ("mock", "test"):
+        return MockTranslationProvider()
+
+    if provider_name in ("auto", ""):
+        if settings.TRANSLATION_API_KEY:
+            return DeepLProvider()
+        return MyMemoryProvider()
+
     raise TranslationConfigError(
-        f"Provedor de tradução '{provider_name}' não é suportado. Opções suportadas: 'deepl'."
+        f"Provedor de tradução '{provider_name}' não é suportado. "
+        "Opções suportadas: 'deepl', 'mymemory', 'libretranslate', 'mock', 'auto'."
     )

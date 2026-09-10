@@ -284,3 +284,45 @@ async def test_concurrent_translations_single_external_call(
 
         # Provider must have been called exactly once!
         assert mock_provider.translate_article.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_translation_service_none_language():
+    import uuid
+    from unittest.mock import MagicMock
+
+    from app.services.translation_service import TranslationService
+
+    mock_session = AsyncMock()
+    service = TranslationService(mock_session)
+
+    mock_article = MagicMock()
+    mock_article.language = None
+    mock_article.title = "Test Article Without Language"
+    mock_article.summary = "Summary"
+    mock_article.content = None
+
+    service.article_repo = AsyncMock()
+    service.article_repo.get_by_id.return_value = mock_article
+    service.repo = AsyncMock()
+    service.repo.get_by_article_and_language.return_value = None
+    service.repo.create_translation.return_value = MagicMock()
+
+    mock_provider = AsyncMock()
+    mock_provider.provider_name = "mock"
+    mock_provider.translate_article.return_value = ArticleTranslationResult(
+        translated_title="Título Teste",
+        translated_summary="Resumo",
+        translated_content=None,
+        detected_source_language="EN",
+        target_language="pt-BR",
+        provider="mock",
+    )
+
+    with patch(
+        "app.services.translation_service.get_translation_provider",
+        return_value=mock_provider,
+    ):
+        result = await service.translate_article(uuid.uuid4(), "pt-BR")
+        assert result is not None
+        mock_provider.translate_article.assert_called_once()

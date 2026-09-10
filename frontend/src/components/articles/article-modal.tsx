@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bookmark,
   Calendar,
@@ -48,52 +48,74 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
 
+  // Keep stable refs to callback props to avoid triggering effects when parents re-render
+  const onStateChangeRef = useRef(onStateChange);
   useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  });
+
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  const articleId = article?.id;
+
+  // Effect to handle article selection / change: only runs when articleId changes!
+  useEffect(() => {
+    if (!articleId) {
+      setTranslation(null);
+      setLanguageMode("original");
+      return;
+    }
+
     let isMounted = true;
     setImageError(false);
+    setTranslationError(null);
     setLanguageMode("original");
     setTranslation(null);
-    setTranslationError(null);
 
-    if (article) {
-      const currentId = article.id;
-      setLocalState(article.state || {
-        is_read: false,
-        is_favorite: false,
-        is_saved: false,
-        is_hidden: false,
-      });
+    // Automatically record opening in background (marks read, records timestamps)
+    recordArticleOpened(articleId).then((updated) => {
+      if (isMounted && updated?.state) {
+        setLocalState(updated.state);
+        onStateChangeRef.current?.(articleId, updated.state);
+      }
+    });
 
-      // Automatically record opening in background (marks read, records timestamps)
-      recordArticleOpened(currentId).then((updated) => {
-        if (isMounted && updated?.state) {
-          setLocalState(updated.state);
-          onStateChange?.(currentId, updated.state);
-        }
-      });
+    // Check if translation already exists in cache
+    fetchArticleTranslation(articleId, "pt-BR").then((cached) => {
+      if (isMounted && cached) {
+        setTranslation(cached);
+      }
+    });
 
-      // Check if translation already exists in cache
-      fetchArticleTranslation(currentId, "pt-BR").then((cached) => {
-        if (isMounted && cached) {
-          setTranslation(cached);
-        }
-      });
-    }
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    if (article) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-    }
     return () => {
       isMounted = false;
+    };
+  }, [articleId]);
+
+  // Sync state changes from parent
+  useEffect(() => {
+    if (article?.state) {
+      setLocalState(article.state);
+    }
+  }, [article?.state]);
+
+  // Lock body scroll and handle Escape key while modal is mounted
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current?.();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
       document.body.style.overflow = "unset";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [article, onClose, onStateChange]);
+  }, []);
 
   if (!article) return null;
 
@@ -213,10 +235,27 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
               Traduzido automaticamente • Português (Brasil)
             </span>
             <button
+              type="button"
               onClick={() => setLanguageMode("original")}
               className="text-cyan-400 hover:text-cyan-200 hover:underline font-medium"
             >
               Ver original
+            </button>
+          </div>
+        )}
+
+        {/* Informative banner when viewing original and translation is available */}
+        {!isPtActive && Boolean(translation) && (
+          <div className="flex items-center justify-between rounded-lg bg-slate-800/50 border border-slate-700/60 px-3 py-2 text-xs text-slate-300">
+            <span className="inline-flex items-center gap-1.5 text-slate-400">
+              Exibindo versão original em inglês
+            </span>
+            <button
+              type="button"
+              onClick={() => setLanguageMode("pt-br")}
+              className="text-cyan-400 hover:text-cyan-200 hover:underline font-medium"
+            >
+              Ver em Português
             </button>
           </div>
         )}
@@ -226,6 +265,7 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
           <div className="rounded-lg bg-rose-950/20 border border-rose-900/30 p-3 text-xs text-rose-300 flex items-center justify-between">
             <span>{translationError}</span>
             <button
+              type="button"
               onClick={handleTranslate}
               className="text-rose-400 hover:text-rose-200 font-medium underline ml-3 shrink-0"
             >
@@ -287,8 +327,9 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
             {translation ? (
               <div className="flex items-center">
                 <button
+                  type="button"
                   onClick={() => setLanguageMode("original")}
-                  className={`px-2 py-1 rounded transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors ${
                     languageMode === "original"
                       ? "bg-slate-800 text-slate-100 font-semibold"
                       : "text-slate-400 hover:text-slate-200"
@@ -297,8 +338,9 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
                   Original
                 </button>
                 <button
+                  type="button"
                   onClick={() => setLanguageMode("pt-br")}
-                  className={`px-2 py-1 rounded transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors ${
                     languageMode === "pt-br"
                       ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30"
                       : "text-slate-400 hover:text-slate-200"
@@ -309,6 +351,7 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
               </div>
             ) : (
               <button
+                type="button"
                 onClick={handleTranslate}
                 disabled={isTranslating}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/30 transition-colors disabled:opacity-50"
