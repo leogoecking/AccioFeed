@@ -38,6 +38,19 @@ export interface ArticleStatePublic {
   last_opened_at?: string | null;
 }
 
+export interface ArticleTranslationPublic {
+  id: string;
+  article_id: string;
+  language: string;
+  translated_title: string;
+  translated_summary?: string | null;
+  translated_content?: string | null;
+  provider: string;
+  detected_source_language?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ArticlePublic {
   id: string;
   title: string;

@@ -3,6 +3,7 @@ import {
   ArticleFilters,
   ArticlePublic,
   ArticleStatePublic,
+  ArticleTranslationPublic,
   FeedValidateResponse,
   LibraryStats,
   PaginatedResponse,
@@ -197,3 +198,40 @@ export async function fetchCategories(): Promise<string[]> {
     return [];
   }
 }
+
+export async function fetchArticleTranslation(
+  articleId: string,
+  language: string = "pt-BR"
+): Promise<ArticleTranslationPublic | null> {
+  const url = `${API_BASE}/api/v1/articles/${articleId}/translations?language=${encodeURIComponent(language)}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (error) {
+    console.error("API error fetchArticleTranslation:", error);
+    return null;
+  }
+}
+
+export async function translateArticle(
+  articleId: string,
+  language: string = "pt-BR"
+): Promise<ArticleTranslationPublic> {
+  const url = `${API_BASE}/api/v1/articles/${articleId}/translations`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(
+      errorData.detail ||
+        "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original."
+    );
+  }
+  return await res.json();
+}
+

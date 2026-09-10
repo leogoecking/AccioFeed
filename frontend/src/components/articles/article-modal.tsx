@@ -8,6 +8,8 @@ import {
   Circle,
   EyeOff,
   ExternalLink,
+  Languages,
+  Loader2,
   MessageSquare,
   Star,
   Tag,
@@ -15,9 +17,14 @@ import {
   User,
   X,
 } from "lucide-react";
-import { ArticlePublic, ArticleStatePublic } from "@/lib/types";
+import { ArticlePublic, ArticleStatePublic, ArticleTranslationPublic } from "@/lib/types";
 import { getCategoryBadge, getSourceBadge } from "@/lib/utils";
-import { recordArticleOpened, updateArticleState } from "@/lib/api";
+import {
+  fetchArticleTranslation,
+  recordArticleOpened,
+  translateArticle,
+  updateArticleState,
+} from "@/lib/api";
 
 interface ArticleModalProps {
   article: ArticlePublic | null;
@@ -35,8 +42,18 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     is_hidden: false,
   });
 
+  // Translation states
+  const [languageMode, setLanguageMode] = useState<"original" | "pt-br">("original");
+  const [translation, setTranslation] = useState<ArticleTranslationPublic | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+
   useEffect(() => {
     setImageError(false);
+    setLanguageMode("original");
+    setTranslation(null);
+    setTranslationError(null);
+
     if (article) {
       setLocalState(article.state || {
         is_read: false,
@@ -50,6 +67,13 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
         if (updated?.state) {
           setLocalState(updated.state);
           onStateChange?.(article.id, updated.state);
+        }
+      });
+
+      // Check if translation already exists in cache
+      fetchArticleTranslation(article.id, "pt-BR").then((cached) => {
+        if (cached) {
+          setTranslation(cached);
         }
       });
     }
@@ -109,6 +133,32 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     await updateArticleState(article.id, { is_hidden: true });
   };
 
+  const handleTranslate = async () => {
+    if (translation) {
+      setLanguageMode("pt-br");
+      return;
+    }
+    setIsTranslating(true);
+    setTranslationError(null);
+    try {
+      const res = await translateArticle(article.id, "pt-BR");
+      setTranslation(res);
+      setLanguageMode("pt-br");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original.";
+      setTranslationError(msg);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const isPtActive = languageMode === "pt-br" && Boolean(translation);
+  const displayTitle = isPtActive ? translation!.translated_title : article.title;
+  const displaySummary = isPtActive && translation?.translated_summary ? translation.translated_summary : article.summary;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl p-6 sm:p-8 space-y-6">
@@ -138,8 +188,37 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
 
         {/* Title */}
         <h2 className="text-xl sm:text-2xl font-bold text-slate-100 leading-snug">
-          {article.title}
+          {displayTitle}
         </h2>
+
+        {/* Translation Banner (if active) */}
+        {isPtActive && (
+          <div className="flex items-center justify-between rounded-lg bg-cyan-950/30 border border-cyan-900/40 px-3 py-2 text-xs text-cyan-300">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+              Traduzido automaticamente • Português (Brasil)
+            </span>
+            <button
+              onClick={() => setLanguageMode("original")}
+              className="text-cyan-400 hover:text-cyan-200 hover:underline font-medium"
+            >
+              Ver original
+            </button>
+          </div>
+        )}
+
+        {/* Translation Error Alert (if any) */}
+        {translationError && (
+          <div className="rounded-lg bg-rose-950/20 border border-rose-900/30 p-3 text-xs text-rose-300 flex items-center justify-between">
+            <span>{translationError}</span>
+            <button
+              onClick={handleTranslate}
+              className="text-rose-400 hover:text-rose-200 font-medium underline ml-3 shrink-0"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
 
         {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2 border-y border-slate-800/80 py-3">
@@ -187,6 +266,50 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
               </>
             )}
           </button>
+
+          {/* Language Switcher */}
+          <div className="inline-flex items-center rounded-lg border border-slate-800 bg-slate-950/80 p-0.5 text-xs">
+            <Languages className="h-3.5 w-3.5 text-slate-400 ml-2 mr-1" />
+            {translation ? (
+              <div className="flex items-center">
+                <button
+                  onClick={() => setLanguageMode("original")}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    languageMode === "original"
+                      ? "bg-slate-800 text-slate-100 font-semibold"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  Original
+                </button>
+                <button
+                  onClick={() => setLanguageMode("pt-br")}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    languageMode === "pt-br"
+                      ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  PT-BR
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleTranslate}
+                disabled={isTranslating}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/30 transition-colors disabled:opacity-50"
+              >
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin text-cyan-400" />
+                    <span>Traduzindo...</span>
+                  </>
+                ) : (
+                  <span>Traduzir para Português</span>
+                )}
+              </button>
+            )}
+          </div>
 
           <button
             onClick={handleHide}
@@ -241,8 +364,8 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
         {/* Summary or Content */}
         <div className="space-y-4">
           <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed">
-            {article.summary ? (
-              <p className="whitespace-pre-line leading-relaxed">{article.summary}</p>
+            {displaySummary ? (
+              <p className="whitespace-pre-line leading-relaxed">{displaySummary}</p>
             ) : (
               <p className="italic text-slate-500">
                 Esta fonte disponibiliza a matéria e discussão diretamente no link original externo.
