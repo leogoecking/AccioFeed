@@ -102,8 +102,11 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     }
   }, [article?.state]);
 
-  // Lock body scroll and handle Escape key while modal is mounted
+  // Lock body scroll and handle Escape key while modal is open
   useEffect(() => {
+    if (!article) return;
+
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -112,10 +115,10 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = originalOverflow || "";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [article]);
 
   if (!article) return null;
 
@@ -196,8 +199,14 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
   const displayBody = isPtActive && translatedBody ? translatedBody : originalBody;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl p-6 sm:p-8 space-y-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl p-6 sm:p-8 space-y-6 my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           onClick={onClose}

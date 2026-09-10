@@ -8,7 +8,7 @@ import {
   ChevronRight,
   RefreshCw,
 } from "lucide-react";
-import { fetchArticles } from "@/lib/api";
+import { fetchArticles, syncAllSources } from "@/lib/api";
 import { ArticleFilters, ArticlePublic, ArticleStatePublic, PaginatedResponse } from "@/lib/types";
 import { ArticleCard } from "./article-card";
 import { ArticleModal } from "./article-modal";
@@ -47,6 +47,20 @@ export function Timeline({
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      await syncAllSources(true);
+      loadData();
+      onStatsRefresh?.();
+    } catch (err) {
+      console.error("Failed to sync sources:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const loadData = () => {
     setIsLoading(true);
@@ -240,6 +254,18 @@ export function Timeline({
               ? `Nenhum resultado para "${searchQuery}". Tente outros termos.`
               : "Explore outras categorias, fontes ou coleções na barra lateral."}
           </p>
+          {activeCollection === "all" && !searchQuery && (
+            <div className="mt-4">
+              <button
+                onClick={handleSyncNow}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-500 disabled:opacity-50 transition-colors shadow-lg shadow-cyan-950/40"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                <span>{isSyncing ? "Buscando notícias..." : "Sincronizar notícias agora"}</span>
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         /* Articles Grid */
@@ -285,12 +311,14 @@ export function Timeline({
       )}
 
       {/* Article Reader Modal */}
-      <ArticleModal
-        article={selectedArticle}
-        onClose={handleCloseModal}
-        onStateChange={handleArticleStateChange}
-        onHide={handleArticleHide}
-      />
+      {selectedArticle && (
+        <ArticleModal
+          article={selectedArticle}
+          onClose={handleCloseModal}
+          onStateChange={handleArticleStateChange}
+          onHide={handleArticleHide}
+        />
+      )}
     </section>
   );
 }

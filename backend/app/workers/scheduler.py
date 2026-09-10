@@ -83,8 +83,10 @@ class IngestionScheduler:
         )
 
         try:
+            first_run = force
             while self._running:
-                await self.run_single_cycle(force=force)
+                await self.run_single_cycle(force=first_run)
+                first_run = False
 
                 if run_once:
                     logger.info("Single run completed. Exiting worker.")

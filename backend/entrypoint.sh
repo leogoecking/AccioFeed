@@ -15,6 +15,9 @@ if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
   exit 1
 fi
 
+echo "Seeding default sources..."
+python -m app.cli seed || echo "Seed skipped or failed."
+
 echo "Starting application server..."
 if [ -n "$PORT" ] && [ "$1" = "uvicorn" ]; then
   exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"

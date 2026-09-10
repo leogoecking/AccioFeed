@@ -25,7 +25,15 @@ class SourceService:
         self.repo = SourceRepository(db)
 
     async def list_sources(self, active_only: bool = False) -> list[Source]:
-        return await self.repo.list_all(active_only=active_only)
+        sources = await self.repo.list_all(active_only=active_only)
+        if not sources:
+            all_sources = await self.repo.list_all(active_only=False)
+            if not all_sources:
+                from app.core.seed import seed_sources
+
+                await seed_sources(self.db)
+                sources = await self.repo.list_all(active_only=active_only)
+        return sources
 
     async def get_source(self, source_id: int) -> Source | None:
         return await self.repo.get_by_id(source_id)

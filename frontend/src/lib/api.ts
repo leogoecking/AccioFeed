@@ -185,8 +185,8 @@ export async function syncSingleSource(id: number): Promise<SyncResponse> {
   return await res.json();
 }
 
-export async function syncAllSources(): Promise<SyncResponse> {
-  const url = `${API_BASE}/api/v1/sources/sync`;
+export async function syncAllSources(force: boolean = true): Promise<SyncResponse> {
+  const url = `${API_BASE}/api/v1/sources/sync?force=${force}`;
   const res = await fetch(url, { method: "POST" });
   return await res.json();
 }

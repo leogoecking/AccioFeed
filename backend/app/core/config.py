@@ -51,7 +51,7 @@ class Settings(BaseSettings):
         return ["*"]
 
     # Worker & Ingestion
-    ENABLE_EMBEDDED_WORKER: bool = False
+    ENABLE_EMBEDDED_WORKER: bool = True
     WORKER_INTERVAL_SECONDS: int = 300
     HN_MAX_STORIES: int = 30
     HTTP_REQUEST_TIMEOUT: int = 15
