@@ -11,10 +11,27 @@ import {
   SyncResponse,
 } from "./types";
 
+export function getCustomApiUrl(): string {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("technewshub_api_url") || "";
+  }
+  return "";
+}
+
+export function setCustomApiUrl(url: string): void {
+  if (typeof window !== "undefined") {
+    if (url.trim()) {
+      localStorage.setItem("technewshub_api_url", url.trim().replace(/\/+$/, ""));
+    } else {
+      localStorage.removeItem("technewshub_api_url");
+    }
+  }
+}
+
 function getApiBase(): string {
   if (typeof window !== "undefined") {
     const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
-    // Only use direct absolute URL if explicitly configured as a public https URL
+    // Only use direct absolute URL if explicitly configured as a public https URL with valid domain
     if (raw && raw.startsWith("https://") && raw.includes(".") && !raw.includes("localhost")) {
       return raw.replace(/\/+$/, "");
     }
@@ -35,6 +52,51 @@ function getApiBase(): string {
 
 const API_BASE = getApiBase();
 
+async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const custom = getCustomApiUrl();
+  const headers = new Headers(init?.headers);
+  if (custom && !headers.has("x-backend-url")) {
+    headers.set("x-backend-url", custom);
+  }
+  return fetch(url, {
+    ...init,
+    headers,
+  });
+}
+
+export async function testBackendConnection(
+  testUrl?: string
+): Promise<{ ok: boolean; message: string; sourceCount?: number }> {
+  try {
+    const headers = new Headers();
+    if (testUrl && testUrl.trim()) {
+      headers.set("x-backend-url", testUrl.trim());
+    }
+    const res = await apiFetch(`${API_BASE}/api/v1/sources`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return {
+        ok: false,
+        message: err.detail || `Erro HTTP ${res.status}: ${res.statusText}`,
+      };
+    }
+    const data = await res.json();
+    return {
+      ok: true,
+      message: "Conexão com a API estabelecida com sucesso!",
+      sourceCount: Array.isArray(data) ? data.length : 0,
+    };
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Falha na requisição",
+    };
+  }
+}
+
 export async function fetchArticles(filters: ArticleFilters = {}): Promise<PaginatedResponse<ArticlePublic>> {
   const params = new URLSearchParams();
 
@@ -49,7 +111,7 @@ export async function fetchArticles(filters: ArticleFilters = {}): Promise<Pagin
   const url = `${API_BASE}/api/v1/articles${params.toString() ? `?${params.toString()}` : ""}`;
 
   try {
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       cache: "no-store",
     });
 
@@ -73,7 +135,7 @@ export async function fetchArticles(filters: ArticleFilters = {}): Promise<Pagin
 export async function fetchArticleById(id: string): Promise<ArticleDetail | null> {
   const url = `${API_BASE}/api/v1/articles/${id}`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await apiFetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     return await res.json();
   } catch (error) {
@@ -88,7 +150,7 @@ export async function updateArticleState(
 ): Promise<ArticlePublic | null> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/state`;
   try {
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(stateUpdate),
@@ -104,7 +166,7 @@ export async function updateArticleState(
 export async function recordArticleOpened(articleId: string): Promise<ArticleDetail | null> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/open`;
   try {
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: "POST",
     });
     if (!res.ok) return null;
@@ -118,7 +180,7 @@ export async function recordArticleOpened(articleId: string): Promise<ArticleDet
 export async function fetchLibraryStats(): Promise<LibraryStats> {
   const url = `${API_BASE}/api/v1/library/stats`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await apiFetch(url, { cache: "no-store" });
     if (!res.ok) {
       return { unread: 0, saved: 0, favorites: 0, total: 0 };
     }
@@ -132,7 +194,7 @@ export async function fetchLibraryStats(): Promise<LibraryStats> {
 export async function fetchSources(activeOnly: boolean = false): Promise<SourcePublic[]> {
   const url = `${API_BASE}/api/v1/sources${activeOnly ? "?active_only=true" : ""}`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await apiFetch(url, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (error) {
@@ -143,7 +205,7 @@ export async function fetchSources(activeOnly: boolean = false): Promise<SourceP
 
 export async function validateFeed(feedUrl: string): Promise<FeedValidateResponse> {
   const url = `${API_BASE}/api/v1/sources/validate`;
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ feed_url: feedUrl }),
@@ -163,7 +225,7 @@ export async function createCustomSource(data: {
   base_url?: string;
 }): Promise<SourcePublic> {
   const url = `${API_BASE}/api/v1/sources`;
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -185,7 +247,7 @@ export async function updateSource(
   }
 ): Promise<SourcePublic> {
   const url = `${API_BASE}/api/v1/sources/${id}`;
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -199,20 +261,20 @@ export async function updateSource(
 
 export async function syncSingleSource(id: number): Promise<SyncResponse> {
   const url = `${API_BASE}/api/v1/sources/${id}/sync`;
-  const res = await fetch(url, { method: "POST" });
+  const res = await apiFetch(url, { method: "POST" });
   return await res.json();
 }
 
 export async function syncAllSources(force: boolean = true): Promise<SyncResponse> {
   const url = `${API_BASE}/api/v1/sources/sync?force=${force}`;
-  const res = await fetch(url, { method: "POST" });
+  const res = await apiFetch(url, { method: "POST" });
   return await res.json();
 }
 
 export async function fetchCategories(): Promise<string[]> {
   const url = `${API_BASE}/api/v1/categories`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await apiFetch(url, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (error) {
@@ -227,7 +289,7 @@ export async function fetchArticleTranslation(
 ): Promise<ArticleTranslationPublic | null> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/translations?language=${encodeURIComponent(language)}`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await apiFetch(url, { cache: "no-store" });
     if (res.status === 404) return null;
     if (!res.ok) return null;
     return await res.json();
@@ -242,7 +304,7 @@ export async function translateArticle(
   language: string = "pt-BR"
 ): Promise<ArticleTranslationPublic> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/translations`;
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ language }),
@@ -256,4 +318,3 @@ export async function translateArticle(
   }
   return await res.json();
 }
-

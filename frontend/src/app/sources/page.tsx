@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { FeedValidateResponse, SourcePublic } from "@/lib/types";
 import { formatRelativeTime, getCategoryBadge, getSourceBadge } from "@/lib/utils";
+import { ApiConfigBanner } from "@/components/common/api-config-banner";
 
 const CATEGORIES = [
   { id: "technology", label: "Tecnologia" },
@@ -272,6 +273,10 @@ export default function SourcesPage() {
                 <Plus className="h-3.5 w-3.5" />
                 <span>Adicionar RSS Manual</span>
               </button>
+            </div>
+
+            <div className="pt-4 max-w-xl mx-auto text-left">
+              <ApiConfigBanner onConnected={loadSources} />
             </div>
           </div>
         ) : (

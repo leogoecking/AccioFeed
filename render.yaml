@@ -58,12 +58,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: INTERNAL_API_URL
-        fromService:
-          type: web
-          name: technewshub-api
-          property: host
+        value: "https://technewshub-api.onrender.com"
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: technewshub-api
-          property: host
+        value: "https://technewshub-api.onrender.com"

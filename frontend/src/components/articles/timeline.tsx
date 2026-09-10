@@ -12,6 +12,7 @@ import { fetchArticles, syncAllSources } from "@/lib/api";
 import { ArticleFilters, ArticlePublic, ArticleStatePublic, PaginatedResponse } from "@/lib/types";
 import { ArticleCard } from "./article-card";
 import { ArticleModal } from "./article-modal";
+import { ApiConfigBanner } from "@/components/common/api-config-banner";
 
 interface TimelineProps {
   activeCategory: string;
@@ -207,18 +208,22 @@ export function Timeline({
 
       {/* Error state */}
       {hasError ? (
-        <div className="rounded-2xl border border-rose-900/50 bg-rose-950/20 p-8 text-center space-y-3">
-          <AlertCircle className="mx-auto h-8 w-8 text-rose-400" />
-          <p className="text-slate-200 font-medium">Não foi possível carregar as notícias.</p>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            O servidor backend pode estar iniciando (cold start no Render leva cerca de 40s). Aguarde alguns segundos e tente novamente.
-          </p>
-          <button
-            onClick={loadData}
-            className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700"
-          >
-            Tentar novamente
-          </button>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-rose-900/50 bg-rose-950/20 p-6 text-center space-y-3">
+            <AlertCircle className="mx-auto h-8 w-8 text-rose-400" />
+            <p className="text-slate-200 font-medium">Não foi possível carregar as notícias.</p>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              O servidor backend pode estar iniciando (cold start no Render leva cerca de 40s) ou a URL da API precisa ser ajustada.
+            </p>
+            <button
+              onClick={loadData}
+              className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+
+          <ApiConfigBanner onConnected={loadData} />
         </div>
       ) : isLoading ? (
         /* Skeletons */
