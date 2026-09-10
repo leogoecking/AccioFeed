@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     HN_MAX_STORIES: int = 30
     HTTP_REQUEST_TIMEOUT: int = 15
 
+    # Translation
+    TRANSLATION_ENABLED: bool = False
+    TRANSLATION_PROVIDER: str = "deepl"
+    TRANSLATION_API_KEY: str = ""
+    TRANSLATION_TARGET_LANGUAGE: str = "pt-BR"
+    TRANSLATION_TIMEOUT_SECONDS: int = 10
+    TRANSLATION_DEEPL_API_URL: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
