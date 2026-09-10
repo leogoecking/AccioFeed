@@ -6,9 +6,26 @@
 
 ## 1. Visão Geral
 
-O **Tech News Hub** é uma plataforma self-hosted construída para centralizar, normalizar e apresentar as principais notícias do ecossistema tecnológico em uma interface moderna, minimalista e com dark mode por padrão.
+O **Tech News Hub** é um leitor inteligente e self-hosted de notícias e discussões sobre tecnologia. O sistema centraliza, normaliza e apresenta as novidades do ecossistema tech em uma interface moderna, minimalista e com dark mode por padrão.
 
-O sistema coleta conteúdos de APIs oficiais (como a do Hacker News) e feeds RSS/Atom, estruturando métricas de popularidade, categorias e resumos em um fluxo unificado.
+### Principais Funcionalidades:
+- 📰 **Timeline Multi-Fonte**: Notícias consolidadas de APIs oficiais (Hacker News) e feeds RSS/Atom de tecnologia de ponta.
+- 📖 **Experiência do Leitor (Reader View)**: Modal de leitura focado, sem distrações, com marcação automática de abertura e links diretos para a fonte original.
+- 📚 **Coleções Pessoais**:
+  - **Tudo**: visão consolidada de todos os artigos não ocultados.
+  - **Não lidos**: feed com artigos ainda não lidos e contador em tempo real.
+  - **Ler depois**: coleção de artigos marcados para leitura futura com data de salvamento.
+  - **Favoritos**: biblioteca de artigos destacados com estrela.
+  - **Histórico**: cronologia de artigos abertos ordenados por última leitura (`last_opened_at`).
+  - **Ocultação de Notícias**: capacidade de esconder itens irrelevantes da timeline.
+- ⚙️ **Gerenciamento de Fontes Dinâmico (`/sources`)**:
+  - Monitoramento operacional de saúde (Healthy, Warning, Error, Disabled).
+  - Ativação e desativação em tempo real com toggle switch.
+  - Sincronização sob demanda (individual por fonte ou global para todas as ativas) com lock assíncrono.
+  - Cadastro de novos feeds RSS com validação ao vivo, extração de metadados e preview prévio.
+- 🛡️ **Segurança em Camadas**:
+  - Proteção estrita contra **SSRF** (bloqueio de RFC 1918, loopback, link-local, `169.254.169.254`, validação em cada redirect HTTP).
+  - Sanitização profunda contra **XSS** em resumos e conteúdos.
 
 ---
 
@@ -154,32 +171,31 @@ New articles: 140
 
 ---
 
-## 8. Como Adicionar ou Remover Fontes RSS
+## 8. Gerenciamento de Fontes e Adição de Feeds Customizados
 
-O sistema utiliza um padrão de fábrica dinâmica (`SourceFactory`) e um provedor genérico (`RSSProvider`).
+O sistema suporta tanto gerenciamento visual via interface web quanto via CLI ou banco de dados:
 
-### Adicionando uma nova fonte RSS:
-Basta registrar a fonte no banco de dados (ou adicionar à lista padrão em `backend/app/core/seed.py` e rodar `python -m app.cli seed`):
+### 8.1. Pela Interface Web (`/sources`):
+1. Acesse [http://localhost:3001/sources](http://localhost:3001/sources) ou clique em **"Gerenciar Fontes"** na barra lateral.
+2. Visualize o status operacional de cada fonte:
+   - 🟢 **Saudável**: Coleta recente bem-sucedida.
+   - 🟡 **Aviso**: Fonte ativa com coletas pendentes ou avisos transitórios.
+   - 🔴 **Erro**: Falha na última coleta (com exibição da mensagem de erro amigável).
+   - ⚪ **Desativada**: Fonte desabilitada pelo usuário.
+3. **Ativar / Desativar**: Alterne o botão toggle na coluna Status. O Worker respeitará imediatamente a alteração.
+4. **Sincronização Manual**: Clique no ícone de atualização ao lado de qualquer fonte, ou use o botão **"Sincronizar Todas"** no topo.
+5. **Adicionar Feed RSS**:
+   - Clique em **"Adicionar Fonte RSS"**.
+   - Digite a URL do feed e clique em **"Validar Feed"**.
+   - O backend executará checagens rigorosas contra SSRF, resolverá o DNS e baixará uma amostra do feed, exibindo um card de preview com título, formato detectado e os primeiros artigos encontrados.
+   - Escolha o nome da fonte, a categoria padrão e o intervalo de coleta e confirme a criação.
 
-```python
-{
-    "name": "Nome da Publicação",
-    "slug": "slug-da-fonte",
-    "type": "rss",
-    "base_url": "https://exemplo.com",
-    "feed_url": "https://exemplo.com/rss.xml",
-    "default_category": "dev",  # ai, hardware, dev, linux, security, science, startups, technology
-    "is_active": True,
-    "poll_interval_minutes": 15,
-}
-```
-
-### Desativando uma fonte:
-Altere a flag `is_active` para `false` no registro da fonte no PostgreSQL:
-```sql
-UPDATE sources SET is_active = false WHERE slug = 'slug-da-fonte';
-```
-O Worker e a CLI ignorarão automaticamente qualquer fonte inativa.
+### 8.2. Proteção contra SSRF (Server-Side Request Forgery):
+Ao adicionar ou validar feeds externos, o sistema bloqueia:
+- Endereços IP locais e privados (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `0.0.0.0`).
+- Endereços de metadados em nuvens AWS/GCP/Azure (`169.254.169.254`).
+- Redirecionamentos HTTP 3xx para redes internas (validação iterativa em cada hop).
+- Payloads excessivos (limite estrito de 5 MB com streaming chunked) e timeout de 10s.
 
 ---
 
@@ -187,16 +203,28 @@ O Worker e a CLI ignorarão automaticamente qualquer fonte inativa.
 
 A API expõe endpoints versionados sob `/api/v1`:
 
-- `GET /health`: Healthcheck detalhado do serviço e banco.
+### Artigos e Biblioteca Pessoal
+- `GET /health`: Healthcheck detalhado do serviço e conectividade com o banco.
+- `GET /api/v1/library/stats`: Estatísticas agregadas da biblioteca pessoal em uma única query (`unread`, `saved`, `favorites`, `total`).
 - `GET /api/v1/articles`: Listagem paginada de artigos com múltiplos filtros:
-  - `page` (padrão: 1) e `page_size` (padrão: 20, máx: 100)
+  - `state` (`all`, `unread`, `favorite`, `saved`, `hidden`, `history`)
   - `source` (slug da fonte, ex: `ars-technica`, `phoronix`, `hacker-news`)
   - `category` (`ai`, `hardware`, `dev`, `linux`, `security`, `science`, `startups`, `technology`)
   - `search` (busca textual em título ou resumo)
-  - `sort` (`newest`, `popular`, `comments`)
+  - `sort` (`recent`, `popular`, `history`, `last_opened`)
   - `timeframe` (`24h`, `7d`, `30d`, `all`)
-- `GET /api/v1/articles/{id}`: Detalhes de um artigo individual.
-- `GET /api/v1/sources`: Listagem de fontes cadastradas, incluindo métricas de saúde (`last_polled_at`, `last_success_at`, `last_error_at`, `last_error_message`).
+  - `page` e `page_size` (máx: 100)
+- `GET /api/v1/articles/{id}`: Detalhes completos de um artigo individual.
+- `PATCH /api/v1/articles/{id}/state`: Atualiza o estado pessoal do artigo (`is_read`, `is_favorite`, `is_saved`, `is_hidden`).
+- `POST /api/v1/articles/{id}/open`: Registra a abertura do artigo no leitor (marca automaticamente como lido e atualiza `first_opened_at` / `last_opened_at`).
+
+### Fontes e Coleta
+- `GET /api/v1/sources`: Listagem de fontes com status calculado (`healthy`, `error`, `disabled`) e métricas de execução.
+- `POST /api/v1/sources`: Cadastro de nova fonte RSS/Atom customizada com validação prévia.
+- `PATCH /api/v1/sources/{id}`: Atualização de atributos da fonte (`is_active`, `poll_interval_minutes`, `default_category`, etc.).
+- `POST /api/v1/sources/validate`: Validação de URL de feed com proteção SSRF e extração de preview.
+- `POST /api/v1/sources/{id}/sync`: Disparo de sincronização manual imediata para uma fonte específica (com lock de concorrência).
+- `POST /api/v1/sources/sync`: Disparo de sincronização manual de todas as fontes ativas.
 - `GET /api/v1/categories`: Lista das categorias suportadas pela plataforma.
 
 ---

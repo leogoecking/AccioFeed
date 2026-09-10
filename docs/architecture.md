@@ -39,6 +39,7 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
                   │    - sources                           │
                   │    - articles (unique: source+ext_id)  │
                   │    - article_metrics                   │
+                  │    - article_states (read, save, fav)  │
                   └──────────────────┬─────────────────────┘
                                      │
                                      ▼ (asyncpg / SQLAlchemy)
@@ -46,6 +47,8 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
                   │             Backend API                │
                   │   - FastAPI (/health, /api/v1/...)     │
                   │   - Repositories & Services            │
+                  │   - SSRF Protection & Feed Validator   │
+                  │   - Manual Sync (asyncio.Lock)         │
                   │   - Structured Logging & CORS          │
                   └──────────────────┬─────────────────────┘
                                      │
@@ -54,7 +57,9 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
                   │            Frontend App                │
                   │   - Next.js (App Router)               │
                   │   - Tailwind CSS + Dark Mode           │
-                  │   - Timeline, Filters & Search         │
+                  │   - Timeline, Filters & Reader Modal   │
+                  │   - Library Collections & Realtime Qty │
+                  │   - Sources Management (/sources)      │
                   └────────────────────────────────────────┘
 ```
 
@@ -135,25 +140,56 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
 - **Escolha**: Defesa em profundidade: sanitização rigorosa no backend na ingestão (`sanitize_text`), decodificação de entidades HTML, remoção de tags de risco, preservação de texto legível e extração segura de imagens candidatas válidas ignorando tracking pixels.
 - **Justificativa**: O banco de dados armazena dados limpos e seguros, tornando as APIs protegidas independentemente de qual cliente as consuma (web, mobile, CLI).
 
-### ADR 09: Concorrência e Resiliência no Agendador de Coleta
-- **Problema**: À medida que o número de fontes aumenta (8+ fontes), coletas sequenciais demoram excessivamente, e coletas concorrentes irrestritas podem exaurir conexões ou causar bloqueios por rate-limiting dos servidores remotos.
+### ADR 10: Estado de Artigos e Experiência do Leitor (Personal Tech Reader)
+- **Problema**: Como gerenciar o estado pessoal do usuário (lido, favorito, ler depois, oculto, histórico de leitura) mantendo o design single-user sem introduzir complexidade precoce de autenticação e multi-tenant?
 - **Alternativas**:
-  1. Coleta sequencial em loop simples.
-  2. Coleta totalmente concorrente com `asyncio.gather(*tasks)` sem limite.
-  3. Coleta concorrente controlada com `asyncio.Semaphore` e intervalo individual por fonte (`poll_interval_minutes`).
-- **Escolha**: Concorrência limitada via `asyncio.Semaphore(MAX_CONCURRENT_SOURCES=4)` combinada com checagem de intervalo por fonte (`is_source_due_for_polling`) e registro de saúde no banco (`last_polled_at`, `last_success_at`, `last_error_at`, `last_error_message`).
-- **Justificativa**: Evita gargalos de I/O, distribui requisições de forma respeitosa para com os servidores de notícias e mantém total visibilidade operacional sobre o status de cada fonte.
+  1. Armazenar o estado exclusivamente no `localStorage` do navegador.
+  2. Adicionar colunas booleanas diretamente na tabela `articles`.
+  3. Criar uma entidade dedicada `article_states` associada via 1:1 com `articles` (`article_id` PK/FK com cascade).
+- **Escolha**: Entidade dedicada `article_states` com relação 1:1, índices específicos e cascade on delete.
+- **Justificativa**: Preserva a integridade do modelo de dados do artigo coletado (imutabilidade do payload da fonte). Permite consultas agregadas eficientes para contadores da biblioteca (`/api/v1/library/stats`) em uma única query com `FILTER (WHERE ...)`. Prepara uma transição suave para multi-user no futuro (bastando adicionar `user_id` e chave composta), sem quebrar a camada atual.
+- **Consequência**: Criação de `ArticleStateRepository` e `ArticleStateService`. A timeline faz `LEFT OUTER JOIN` com `article_states` e preenche valores default em memória quando o estado ainda não existe no banco.
+
+### ADR 11: Prevenção Rigorosa contra SSRF na Adição e Validação de Feeds Customizados
+- **Problema**: Ao permitir que o usuário cadastre feeds RSS arbitrários via interface web, a aplicação corre risco de ataques de Server-Side Request Forgery (SSRF), onde um atacante pode tentar sondar a rede interna (Docker network, localhost, `169.254.169.254` para metadados de nuvem, IPs privados RFC 1918) ou causar DoS via redirects ou feeds gigantes.
+- **Alternativas**:
+  1. Utilizar bibliotecas HTTP padrão com `follow_redirects=True` sem filtragem de IP.
+  2. Validar apenas o scheme da URL (`http://` ou `https://`).
+  3. Validação em camadas com resolução DNS antecipada, blacklist estrita de CIDRs e cliente HTTP seguro com loop manual anti-redirect (`safe_fetch_feed`).
+- **Escolha**: Validação em camadas estrita (`validate_url_ssrf` + `safe_fetch_feed`).
+- **Justificativa**:
+  - Esquema restrito a `http` e `https`.
+  - Resolução DNS de todos os endereços IP do hostname antes da conexão.
+  - Bloqueio imediato de faixas privadas, loopback, link-local e metadados (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.169.254`, `::1`, `0.0.0.0`).
+  - Prevenção de redirect-to-internal SSRF: o cliente HTTP intercepta redirects HTTP 3xx e revalida cada URL de destino antes de seguir para a próxima requisição (máximo de 3 redirects).
+  - Limite de tamanho de payload (máximo 5 MB via streaming chunked) e timeout reduzido (10s) para evitar ataques de DoS/Resource Exhaustion.
+- **Consequência**: Proteção completa e comprovada por testes unitários exaustivos contra ataques SSRF clássicos e evasões via DNS ou redirects.
+
+### ADR 12: Gerenciamento Dinâmico de Fontes e Sincronização Sob Demanda
+- **Problema**: Como permitir a sincronização manual de fontes (individual ou global) via API/UI sem concorrência destrutiva com o worker periódico e sem redefinir customizações de usuários quando o seed for executado?
+- **Alternativas**:
+  1. Disparar subprocessos CLI em segundo plano sem controle de concorrência.
+  2. Implementar locks globais com `asyncio.Lock` em memória na API para serializar requisições manuais de sync, e garantir idempotência não-destrutiva no seed do banco.
+- **Escolha**: Lock assíncrono em memória (`get_sync_lock()`) e atualização condicional no seed (`get_or_create`).
+- **Justificativa**: Evita concorrência e condições de corrida entre chamadas simultâneas de sincronização manual. O seed do banco passa a verificar a existência da fonte pelo `slug` e preserva os valores de `is_active` e `poll_interval_minutes` definidos pelo usuário.
+- **Consequência**: O usuário tem total controle sobre fontes ativas, inativas e intervalos customizados através da interface web (`/sources`), sem risco de sobrescrita.
 
 ---
 
 ## 4. Segurança e Resiliência
 
-1. **Proteção contra SSRF e Timeout de Rede**:
-   - Requisições HTTP externas usam `httpx.AsyncClient` centralizado (`create_http_client`) com timeout estrito configurável (padrão 15s) e User-Agent identificável: `TechNewsHub/1.0 (+https://github.com/usuario/tech-news-hub; RSS Reader)`.
-   - Não são executadas requisições a URLs arbitrárias enviadas por usuários. Feeds são pré-cadastrados ou validados administrativamente.
-2. **Sanitização de Conteúdo e XSS**:
-   - Todo conteúdo textual recebido de fontes externas é sanitizado na ingestão.
-   - Resumos e títulos são renderizados de forma segura no frontend com escape por padrão.
-3. **CORS e Validação**:
+1. **Proteção contra SSRF e Prevenção de Redirects Maliciosos**:
+   - Módulo centralizado `app.core.ssrf` com `validate_url_ssrf` e `safe_fetch_feed`.
+   - Bloqueio incondicional de redes privadas RFC 1918, loopback, link-local e metadados cloud (`169.254.169.254`).
+   - Validação a cada salto de redirect HTTP (máx 3 hops).
+   - Limite de streaming de 5MB por feed e timeout de 10s.
+2. **Sanitização de Conteúdo e Defesa em Profundidade contra XSS**:
+   - Todo conteúdo textual recebido de fontes externas é sanitizado na ingestão via `sanitize_text`.
+   - Remoção de scripts, iframes, atributos com handlers `on*` e tags inseguras.
+   - Resumos e títulos renderizados com segurança no frontend React.
+3. **Isolamento de Estado do Usuário**:
+   - Tabela `article_states` isolada com índices cobrindo `(article_id, is_read)`, `(article_id, is_favorite)`, `(article_id, is_saved)` e `(is_read, is_hidden, last_opened_at)`.
+4. **CORS e Validação**:
    - Configuração de origens CORS explícitas via variável de ambiente `CORS_ORIGINS`.
-   - Validação de contratos via esquemas Pydantic v2 com tipagem estrita e serialização JSON padronizada.
+   - Schemas Pydantic v2 com `extra="forbid"` em schemas de atualização para rejeitar parâmetros maliciosos desconhecidos.
+

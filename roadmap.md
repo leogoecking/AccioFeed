@@ -34,12 +34,16 @@ Este roadmap delineia a evolução planejada para o agregador inteligente e self
 
 ---
 
-## Fase 3 — Reader & UX Avançada
-- [ ] Página interna de leitura focada e sem distrações
-- [ ] Marcação de artigos favoritos e "Ler depois" (armazenamento local/banco)
-- [ ] Histórico de artigos lidos
-- [ ] Interface administrativa para cadastro dinâmico de novas fontes RSS
-- [ ] Notificações no navegador / suporte preliminar a PWA
+## Fase 3 — Reader & UX Avançada (Concluída)
+- [x] Modal de leitura focada e sem distrações (Reader View) com rastreamento automático de leitura
+- [x] Coleções Pessoais na Sidebar: 📰 Tudo, ● Não lidos, 📚 Ler depois, ⭐ Favoritos, 🕘 Histórico (com contadores em tempo real via `/api/v1/library/stats`)
+- [x] Ações rápidas no card e modal: Marcar como lido/não lido, favoritar, salvar para ler depois, ocultar notícia
+- [x] Histórico de leitura com ordenação cronológica por `last_opened_at`
+- [x] Painel de Gerenciamento de Fontes (`/sources`): monitoramento de saúde operacional, ativação/desativação dinâmica e sincronização manual com lock de concorrência
+- [x] Cadastro dinâmico de novos feeds RSS com validação ao vivo, extração de metadados e preview prévio
+- [x] Defesa em camadas contra SSRF (bloqueio de IPs privados, loopback, metadados AWS/GCP, anti-redirect e limites de payload)
+- [x] Idempotência do seed de fontes preservando alterações manuais do usuário
+- [ ] Notificações no navegador / suporte preliminar a PWA (Fase futura)
 
 ---
 
