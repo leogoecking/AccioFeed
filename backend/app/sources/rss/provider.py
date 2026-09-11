@@ -2,7 +2,6 @@ from typing import Any
 
 import httpx
 
-from app.core.http import create_http_client
 from app.sources.base import BaseSourceProvider, NormalizedArticle
 from app.sources.rss.parser import RSSParser
 

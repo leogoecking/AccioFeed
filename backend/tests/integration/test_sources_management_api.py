@@ -175,11 +175,10 @@ async def test_sync_source_and_sync_all_endpoints(
         )
     )
 
-    with patch.object(
-        SourceRepository, "record_poll_result", new_callable=AsyncMock
-    ), patch(
-        "app.services.collector_service.resolve_provider_for_source"
-    ) as mock_resolve:
+    with (
+        patch.object(SourceRepository, "record_poll_result", new_callable=AsyncMock),
+        patch("app.services.collector_service.resolve_provider_for_source") as mock_resolve,
+    ):
         mock_provider = AsyncMock()
         mock_provider.fetch.return_value = []
         mock_resolve.return_value = mock_provider
