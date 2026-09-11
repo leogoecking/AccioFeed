@@ -2,16 +2,23 @@
 
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Bookmark,
   CheckCircle2,
   Circle,
   ExternalLink,
+  Languages,
+  Loader2,
   Newspaper,
   PanelRightClose,
   Star,
   X,
 } from "lucide-react";
-import { ArticlePublic, ArticleStatePublic } from "@/lib/types";
+import {
+  ArticlePublic,
+  ArticleStatePublic,
+  ArticleTranslationPublic,
+} from "@/lib/types";
 import {
   cn,
   estimateReadingTime,
@@ -20,7 +27,11 @@ import {
   getCategoryBadge,
   getSourceBadge,
 } from "@/lib/utils";
-import { updateArticleState } from "@/lib/api";
+import {
+  fetchArticleTranslation,
+  translateArticle,
+  updateArticleState,
+} from "@/lib/api";
 
 interface QuickPreviewProps {
   article: ArticlePublic | null;
@@ -39,8 +50,24 @@ export function QuickPreview({
   const [imageError, setImageError] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Translation states
+  const [translation, setTranslation] = useState<ArticleTranslationPublic | null>(null);
+  const [activeLang, setActiveLang] = useState<"original" | "pt-BR">("original");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+
   useEffect(() => {
     setImageError(false);
+    setTranslation(null);
+    setActiveLang("original");
+    setIsTranslating(false);
+    setTranslationError(null);
+
+    if (article?.id) {
+      fetchArticleTranslation(article.id, "pt-BR").then((cached) => {
+        if (cached) setTranslation(cached);
+      });
+    }
   }, [article?.id]);
 
   if (!article) return null;
@@ -56,7 +83,38 @@ export function QuickPreview({
   const sourceMeta = getSourceBadge(article.source.slug);
   const timeFormatted = formatRelativeTime(article.published_at);
   const fullDateFormatted = formatFullDate(article.published_at);
-  const contentBody = article.summary || article.content;
+
+  const handleTranslate = async () => {
+    if (!article?.id) return;
+    if (translation) {
+      setActiveLang("pt-BR");
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError(null);
+    try {
+      const res = await translateArticle(article.id, "pt-BR");
+      setTranslation(res);
+      setActiveLang("pt-BR");
+    } catch (err: unknown) {
+      setTranslationError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível traduzir agora. O conteúdo original permanece acessível."
+      );
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const isTranslated = activeLang === "pt-BR" && Boolean(translation);
+  const displayTitle = isTranslated && translation?.translated_title
+    ? translation.translated_title
+    : article.title;
+  const contentBody = isTranslated && (translation?.translated_content || translation?.translated_summary)
+    ? (translation.translated_content || translation.translated_summary)
+    : (article.summary || article.content);
   const readingTime = estimateReadingTime(contentBody);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
@@ -133,24 +191,96 @@ export function QuickPreview({
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Metadata Badges */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", sourceMeta.badgeClass)}>
-              {article.source.name}
-            </span>
-            <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
-              {categoryMeta.label}
-            </span>
-            {readingTime && (
-              <span className="ml-auto font-mono text-[11px] text-zinc-400">
-                {readingTime}
+          {/* Metadata Badges & Language Toggle */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", sourceMeta.badgeClass)}>
+                {article.source.name}
               </span>
-            )}
+              <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
+                {categoryMeta.label}
+              </span>
+              {readingTime && (
+                <span className="font-mono text-[11px] text-zinc-500 hidden sm:inline">
+                  {readingTime}
+                </span>
+              )}
+            </div>
+
+            {/* Language Toggle */}
+            <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setActiveLang("original")}
+                className={cn(
+                  "rounded px-2 py-0.5 font-medium transition-colors",
+                  activeLang === "original"
+                    ? "bg-zinc-800 text-zinc-100 shadow-xs"
+                    : "text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                Original
+              </button>
+              <button
+                type="button"
+                onClick={handleTranslate}
+                disabled={isTranslating}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-2 py-0.5 font-medium transition-colors",
+                  activeLang === "pt-BR"
+                    ? "bg-rose-600 text-white shadow-xs font-semibold"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
+                  isTranslating && "opacity-80"
+                )}
+                title="Traduzir notícia para português (Brasil)"
+              >
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin text-rose-300" />
+                    <span>Traduzindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Languages className="h-3 w-3" />
+                    <span>PT-BR</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* Provider Badge if translated */}
+          {isTranslated && translation && (
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-rose-900/30 bg-rose-950/20 px-2 py-0.5 text-[10px] font-mono text-rose-300">
+              <Languages className="h-3 w-3 text-rose-400" />
+              <span>
+                {translation.provider === "original_pt"
+                  ? "Original em português"
+                  : `Traduzido (${translation.provider.toUpperCase()})`}
+              </span>
+            </div>
+          )}
+
+          {/* Translation Error Banner */}
+          {translationError && (
+            <div className="flex items-center justify-between rounded-lg border border-amber-800/40 bg-amber-950/20 p-2.5 text-xs text-amber-300">
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <span className="text-[11px]">{translationError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTranslationError(null)}
+                className="text-amber-400 hover:text-amber-200"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
 
           {/* Title */}
           <h2 className="text-lg font-bold leading-snug text-zinc-100">
-            {article.title}
+            {displayTitle}
           </h2>
 
           {/* Author */}

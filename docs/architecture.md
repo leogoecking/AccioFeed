@@ -210,7 +210,25 @@ O **AccioFeed** é um agregador inteligente e self-hosted de notícias e discuss
   3. Aplicar `defer(Article.content)` na consulta SQLAlchemy da timeline e implementar debouncing de 300ms no input de busca frontend, mantendo carregamento completo de `content` apenas na abertura do artigo (`/articles/{id}`).
 - **Escolha**: `defer(Article.content)` no repositório + extração segura em `ArticlePublic` + debouncing de 300ms no frontend.
 - **Justificativa**: Reduz drasticamente o tamanho do payload JSON na timeline (de centenas de KB para poucos KB), economizando banda e tempo de renderização no cliente. O debouncing de 300ms garante digitação 100% fluida enquanto previne rajadas de requisições ao backend.
-- **Consequência**: Timeline ultra responsiva mesmo em redes móveis ou conexões lentas.
+### ADR 10: Busca Textual de Alta Performance com PostgreSQL FTS e Unaccent
+- **Problema**: A busca por `LIKE %termo%` não escala, não tolera diacríticos da língua portuguesa (ex.: buscar "inteligencia" não encontrava "inteligência") e não pondera relevância textual entre título, resumo e conteúdo.
+- **Alternativas**:
+  1. Manter `ILIKE %termo%` simples em SQL.
+  2. Adicionar ElasticSearch/Meilisearch como serviço externo separado.
+  3. Utilizar Full-Text Search nativo do PostgreSQL com índice GIN funcional, função wrapper `immutable_unaccent` e configuração `simple`.
+- **Escolha**: PostgreSQL Full-Text Search nativo com `tsvector`, `websearch_to_tsquery('simple', immutable_unaccent(:query))`, índice GIN e ponderação de pesos (A: título, B: resumo, C: autor/categoria, D: conteúdo).
+- **Justificativa**: Evita a complexidade e consumo de memória de serviços adicionais como Elasticsearch. O PostgreSQL executa buscas textuais complexas em menos de 1ms com bitmap scan no índice GIN. A configuração `simple` associada ao `immutable_unaccent` evita que o stemming agressivo de um idioma quebre o vocabulário do outro em um corpus técnico misto (inglês/português).
+- **Consequência**: Busca instantânea, tolerante a acentos e com fallback transparente para SQLite nos testes automatizados.
+
+### ADR 11: Tradução Sob Demanda no Leitor com Cache Idempotente
+- **Problema**: Notícias em inglês dificultam a leitura de parte dos usuários, mas traduzir a timeline inteira de forma automatizada consumiria cotas externas exorbitantes, introduziria lentidão na navegação e degradaria a experiência com conteúdos já em português.
+- **Alternativas**:
+  1. Traduzir todos os artigos automaticamente durante o processo de ingestão no worker.
+  2. Usar extensões do navegador pelo próprio usuário.
+  3. Tradução sob demanda no Reader Modal e Quick Preview, com cache persistido em banco de dados (`article_translations`), skip inteligente de textos em português e interface não-bloqueante.
+- **Escolha**: Tradução sob demanda exclusivamente acionada pelo usuário na tela de leitura com persistência local em PostgreSQL.
+- **Justificativa**: Zero desperdício de cota com notícias não lidas. O texto original permanece 100% legível enquanto a tradução ocorre em segundo plano. Uma vez traduzido, o artigo é servido instantaneamente do cache local sem novas requisições externas. Falhas no provedor não impedem o acesso ao artigo original.
+- **Consequência**: Experiência fluida, confiável, econômica e sem scraping invasivo de sites de terceiros.
 
 ---
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   HelpCircle,
   Menu,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 interface HeaderProps {
   searchQuery: string;
   onSearchChange: (val: string) => void;
+  onSearchSubmit?: (val: string) => void;
   onRefresh?: () => Promise<void> | void;
   isRefreshing?: boolean;
   refreshStatusText?: string | null;
@@ -29,6 +31,7 @@ interface HeaderProps {
 export function Header({
   searchQuery,
   onSearchChange,
+  onSearchSubmit,
   onRefresh,
   isRefreshing = false,
   refreshStatusText = null,
@@ -38,6 +41,7 @@ export function Header({
   onOpenShortcutsHelp,
   onOpenCommandPalette,
 }: HeaderProps) {
+  const router = useRouter();
   const [isMac, setIsMac] = useState(false);
 
   useEffect(() => {
@@ -92,7 +96,15 @@ export function Header({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") onSearchChange("");
+                if (e.key === "Escape") {
+                  onSearchChange("");
+                } else if (e.key === "Enter") {
+                  if (onSearchSubmit) {
+                    onSearchSubmit(searchQuery);
+                  } else if (searchQuery.trim()) {
+                    router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                  }
+                }
               }}
               className="w-full rounded-lg border border-zinc-800 bg-zinc-900/60 pl-8 pr-16 py-1.5 text-xs sm:text-sm text-zinc-200 placeholder-zinc-500 outline-none transition-all focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/30"
               aria-label="Buscar notícias"

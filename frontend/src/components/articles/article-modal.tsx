@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   Bookmark,
   CheckCircle2,
@@ -10,11 +11,17 @@ import {
   Circle,
   EyeOff,
   ExternalLink,
+  Languages,
+  Loader2,
   Newspaper,
   Star,
   X,
 } from "lucide-react";
-import { ArticlePublic, ArticleStatePublic } from "@/lib/types";
+import {
+  ArticlePublic,
+  ArticleStatePublic,
+  ArticleTranslationPublic,
+} from "@/lib/types";
 import {
   cn,
   estimateReadingTime,
@@ -23,7 +30,12 @@ import {
   getCategoryBadge,
   getSourceBadge,
 } from "@/lib/utils";
-import { recordArticleOpened, updateArticleState } from "@/lib/api";
+import {
+  fetchArticleTranslation,
+  recordArticleOpened,
+  translateArticle,
+  updateArticleState,
+} from "@/lib/api";
 
 interface ArticleModalProps {
   article: ArticlePublic | null;
@@ -54,6 +66,12 @@ export function ArticleModal({
     is_saved: false,
     is_hidden: false,
   });
+
+  // Translation states (Milestone 4, 5 & 6)
+  const [translation, setTranslation] = useState<ArticleTranslationPublic | null>(null);
+  const [activeLang, setActiveLang] = useState<"original" | "pt-BR">("original");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const originalScrollY = useRef(0);
@@ -88,6 +106,18 @@ export function ArticleModal({
     let isMounted = true;
     setImageError(false);
     setReadingProgress(0);
+
+    // Reset translation state for new article and look for cached translation
+    setTranslation(null);
+    setActiveLang("original");
+    setIsTranslating(false);
+    setTranslationError(null);
+
+    fetchArticleTranslation(articleId, "pt-BR").then((cached) => {
+      if (isMounted && cached) {
+        setTranslation(cached);
+      }
+    });
 
     // Automatically record opening in background (marks read, records timestamps)
     recordArticleOpened(articleId).then((updated) => {
@@ -172,7 +202,39 @@ export function ArticleModal({
   const sourceMeta = getSourceBadge(article.source.slug);
   const timeFormatted = formatRelativeTime(article.published_at);
   const fullDateFormatted = formatFullDate(article.published_at);
-  const contentBody = article.content || article.summary;
+
+  const handleTranslate = async () => {
+    if (!article?.id) return;
+    if (translation) {
+      setActiveLang("pt-BR");
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslationError(null);
+    try {
+      const res = await translateArticle(article.id, "pt-BR");
+      setTranslation(res);
+      setActiveLang("pt-BR");
+    } catch (err: unknown) {
+      setTranslationError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível traduzir esta notícia agora. O conteúdo original permanece acessível."
+      );
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const isTranslated = activeLang === "pt-BR" && Boolean(translation);
+  const displayTitle = isTranslated && translation?.translated_title
+    ? translation.translated_title
+    : article.title;
+  const rawBody = isTranslated && (translation?.translated_content || translation?.translated_summary)
+    ? (translation.translated_content || translation.translated_summary)
+    : (article.content || article.summary);
+  const contentBody = rawBody;
   const readingTime = estimateReadingTime(contentBody);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
@@ -291,23 +353,91 @@ export function ArticleModal({
                 </span>
               </div>
 
-              {/* Language Mode Placeholder (Section 82: Prepared without external call) */}
-              <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/60 p-0.5 text-[11px] text-zinc-400">
-                <span className="rounded px-2 py-0.5 font-medium bg-zinc-800 text-zinc-200">
-                  Original
-                </span>
-                <span
-                  className="rounded px-2 py-0.5 font-medium text-zinc-500 cursor-not-allowed opacity-60"
-                  title="Tradução PT-BR estará disponível na próxima etapa"
-                >
-                  PT-BR (em breve)
-                </span>
+              {/* Language Mode Toggle (Milestones 4-6) */}
+              <div className="flex items-center gap-2">
+                {isTranslated && translation && (
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-rose-900/30 bg-rose-950/20 px-2 py-0.5 text-[10px] font-mono text-rose-300">
+                    <Languages className="h-3 w-3 text-rose-400" />
+                    <span>
+                      {translation.provider === "original_pt"
+                        ? "Original em português"
+                        : `Traduzido (${translation.provider.toUpperCase()})`}
+                    </span>
+                  </span>
+                )}
+
+                <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveLang("original")}
+                    className={cn(
+                      "rounded px-2.5 py-1 font-medium transition-colors",
+                      activeLang === "original"
+                        ? "bg-zinc-800 text-zinc-100 shadow-xs"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    Original
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTranslate}
+                    disabled={isTranslating}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors",
+                      activeLang === "pt-BR"
+                        ? "bg-rose-600 text-white shadow-xs font-semibold"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
+                      isTranslating && "opacity-80"
+                    )}
+                    title="Traduzir notícia para português (Brasil)"
+                  >
+                    {isTranslating ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin text-rose-300" />
+                        <span>Traduzindo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Languages className="h-3 w-3" />
+                        <span>PT-BR</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Translation Error Banner (Discreet & Non-blocking) */}
+            {translationError && (
+              <div className="flex items-center justify-between rounded-xl border border-amber-800/40 bg-amber-950/20 p-3 text-xs text-amber-300 animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span>{translationError}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleTranslate}
+                    className="underline font-semibold hover:text-amber-200"
+                  >
+                    Tentar novamente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTranslationError(null)}
+                    className="text-amber-400 hover:text-amber-200"
+                    title="Dispensar aviso"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Title */}
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-50 leading-snug">
-              {article.title}
+              {displayTitle}
             </h1>
 
             {/* Author, Date & Reading Time */}

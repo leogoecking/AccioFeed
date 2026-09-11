@@ -87,7 +87,8 @@ export interface ArticleFilters {
   category?: string;
   state?: "all" | "unread" | "favorite" | "saved" | "hidden" | "history";
   search?: string;
-  sort?: "recent" | "popular" | "history" | "last_opened";
+  sort?: "recent" | "popular" | "history" | "last_opened" | "relevance" | "oldest";
+  period?: "today" | "24h" | "7d" | "30d" | "all";
   page?: number;
   pageSize?: number;
 }

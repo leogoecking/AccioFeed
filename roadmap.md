@@ -61,18 +61,34 @@ Este roadmap delineia a evolução planejada para o **AccioFeed_**, um agregador
 
 ---
 
-## Fase 5 — Tradução & Experiência Multilíngue (Próxima Etapa)
+## Fase 5 — Tradução & Experiência Multilíngue (Concluída)
 - [x] Abstração extensível de provedores de tradução (`BaseTranslationProvider`)
-- [x] Provedor funcional DeepL (`DeepLProvider`) e cache local em banco de dados
-- [x] Placeholder no Reader View (`Original | PT-BR (em breve)`)
-- [ ] Ativação da tradução sob demanda completa com fallback resiliente e detecção de idioma na UI
+- [x] Provedores funcionais: DeepL (`DeepLProvider`), MyMemory (`MyMemoryProvider`), LibreTranslate (`LibreTranslateProvider`) e Mock para testes
+- [x] Tradução sob demanda exclusivamente acionada pelo usuário no Reader Modal e Quick Preview
+- [x] Cache determinístico e idempotente em banco de dados (`article_translations`) com índice único por artigo e idioma
+- [x] Detecção e skip inteligente de artigos em português (sem consumo de cota externa para conteúdo já em PT-BR)
+- [x] Interface não-bloqueante: texto original permanece visível e legível enquanto a tradução ocorre em segundo plano
+- [x] Tratamento gracioso de erros (429 cota excedida, 502 bad gateway, 503 indisponível) com aviso discreto e ação "Tentar novamente"
 
 ---
 
-## Fase 6 — Busca Avançada, Filtros & Curadoria
-- [ ] Busca textual avançada (Full-Text Search) com PostgreSQL (`tsvector`/`tsquery`)
+## Fase 6 — Busca de Alta Qualidade & Filtros Precisos (Concluída)
+- [x] Busca textual avançada (Full-Text Search) nativa com PostgreSQL (`tsvector`, `tsquery`, `websearch_to_tsquery`)
+- [x] Suporte a unaccent (`immutable_unaccent`) e corpus multilíngue (`simple`) para correspondência de diacríticos e jargão técnico
+- [x] Índice GIN dedicado (`ix_articles_search_vector_gin`) com ponderação de pesos (A: título, B: resumo, C: autor/categoria, D: conteúdo) e bônus de relevância
+- [x] Filtros por períodos relativos: Hoje, Últimas 24h, 7 dias, 30 dias, Todo período
+- [x] Ordenação combinada: Mais relevantes (`relevance`), Mais recentes (`recent`), Mais antigos (`oldest`)
+- [x] Página dedicada de busca (`/search`) com sincronização bidirecional na URL (`?q=...&category=...&period=...&sort=...`)
+- [x] Histórico de buscas recentes salvo localmente (`localStorage`) com opção de limpeza
+- [x] Destaque seguro de termos pesquisados (`<HighlightText />`) sem injeção de HTML vulnerável (`dangerouslySetInnerHTML`)
+- [x] Integração total com Command Palette (`Ctrl+K`) e Header para pulo direto para `/search`
+- [x] Cancelamento de requisições pendentes com `AbortController` e debounce de digitação
+- [x] Estados de zero resultados com sugestões e botão "Limpar filtros", e skeletons discretos durante o carregamento
+
+---
+
+## Fase 7 — Curadoria & Manutenção
 - [ ] Importação e exportação de feeds em formato OPML
-- [ ] Filtros combinados por intervalo de datas e ordenação multicritério
 - [ ] Limpeza automática e retenção configurável de artigos antigos (Housekeeping)
 
 ---

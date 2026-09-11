@@ -97,7 +97,10 @@ export async function testBackendConnection(
   }
 }
 
-export async function fetchArticles(filters: ArticleFilters = {}): Promise<PaginatedResponse<ArticlePublic>> {
+export async function fetchArticles(
+  filters: ArticleFilters = {},
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ArticlePublic>> {
   const params = new URLSearchParams();
 
   if (filters.source) params.set("source", filters.source);
@@ -105,6 +108,7 @@ export async function fetchArticles(filters: ArticleFilters = {}): Promise<Pagin
   if (filters.state && filters.state !== "all") params.set("state", filters.state);
   if (filters.search) params.set("search", filters.search);
   if (filters.sort) params.set("sort", filters.sort);
+  if (filters.period && filters.period !== "all") params.set("period", filters.period);
   if (filters.page) params.set("page", filters.page.toString());
   if (filters.pageSize) params.set("page_size", filters.pageSize.toString());
 
@@ -113,6 +117,7 @@ export async function fetchArticles(filters: ArticleFilters = {}): Promise<Pagin
   try {
     const res = await apiFetch(url, {
       cache: "no-store",
+      signal: options?.signal,
     });
 
     if (!res.ok) {
@@ -120,7 +125,10 @@ export async function fetchArticles(filters: ArticleFilters = {}): Promise<Pagin
     }
 
     return await res.json();
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     console.error("API error fetchArticles:", error);
     return {
       items: [],

@@ -238,6 +238,18 @@ export function CommandPalette({
         },
       },
       {
+        id: "act-search-page",
+        title: "Busca de alta precisão",
+        subtitle: "Pesquisar por notícias com filtros por período e relevância",
+        icon: Search,
+        group: "Ações",
+        keywords: ["busca", "search", "pesquisa", "encontrar", "palavras"],
+        action: () => {
+          onClose();
+          router.push("/search");
+        },
+      },
+      {
         id: "act-sources",
         title: "Gerenciar fontes e feeds",
         subtitle: "Configurar feeds RSS, ver status e adicionar novas fontes",
@@ -275,17 +287,32 @@ export function CommandPalette({
 
   // Filter items based on query
   const filteredItems = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const trimmed = query.trim();
+    const q = trimmed.toLowerCase();
     if (!q) return allItems;
 
-    return allItems.filter((item) => {
+    const matched = allItems.filter((item) => {
       const matchTitle = item.title.toLowerCase().includes(q);
       const matchSub = item.subtitle?.toLowerCase().includes(q);
       const matchGroup = item.group.toLowerCase().includes(q);
       const matchKeywords = item.keywords?.some((k) => k.toLowerCase().includes(q));
       return matchTitle || matchSub || matchGroup || matchKeywords;
     });
-  }, [allItems, query]);
+
+    const searchActionItem: CommandItem = {
+      id: `act-search-${trimmed}`,
+      title: `Buscar por "${trimmed}" no acervo`,
+      subtitle: "Abrir página de busca com filtros por período e relevância",
+      icon: Search,
+      group: "Ações",
+      action: () => {
+        onClose();
+        router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+      },
+    };
+
+    return [searchActionItem, ...matched];
+  }, [allItems, query, onClose, router]);
 
   // Clamp activeIndex
   useEffect(() => {

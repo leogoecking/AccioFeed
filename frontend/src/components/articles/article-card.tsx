@@ -24,6 +24,7 @@ import {
   getSourceBadge,
 } from "@/lib/utils";
 import { updateArticleState } from "@/lib/api";
+import { HighlightText } from "@/components/common/highlight-text";
 
 interface ArticleCardProps {
   article: ArticlePublic;
@@ -34,6 +35,7 @@ interface ArticleCardProps {
   onStateChange?: (articleId: string, newState: Partial<ArticleStatePublic>) => void;
   onHide?: (articleId: string) => void;
   isSelected?: boolean;
+  searchQuery?: string;
 }
 
 export function ArticleCard({
@@ -45,6 +47,7 @@ export function ArticleCard({
   onStateChange,
   onHide,
   isSelected = false,
+  searchQuery,
 }: ArticleCardProps) {
   const [imageError, setImageError] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -167,7 +170,7 @@ export function ArticleCard({
                 state.is_read ? "text-zinc-300 font-normal" : "text-zinc-100 font-semibold"
               )}
             >
-              {article.title}
+              <HighlightText text={article.title} query={searchQuery} />
             </h3>
           </div>
         </div>
@@ -380,13 +383,13 @@ export function ArticleCard({
                 : "font-semibold text-zinc-100 group-hover:text-rose-400"
             )}
           >
-            {article.title}
+            <HighlightText text={article.title} query={searchQuery} />
           </h3>
 
           {/* Summary */}
           {article.summary ? (
             <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
-              {article.summary}
+              <HighlightText text={article.summary} query={searchQuery} />
             </p>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-zinc-600 italic">

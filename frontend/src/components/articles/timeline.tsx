@@ -757,6 +757,7 @@ export function Timeline({
                   <ArticleCard
                     article={article}
                     density={density}
+                    searchQuery={searchQuery}
                     isNewSinceLastVisit={isNew}
                     isSelected={selectedNavIndex === index}
                     onSelect={(art) => {

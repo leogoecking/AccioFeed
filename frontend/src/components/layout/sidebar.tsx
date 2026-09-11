@@ -13,6 +13,7 @@ import {
   Layers,
   Newspaper,
   Rocket,
+  Search,
   Settings,
   Shield,
   Star,
@@ -112,6 +113,19 @@ export function Sidebar({
           </h3>
         )}
         <nav className={cn("mt-1.5 space-y-0.5", isCollapsed && "mt-0")}>
+          <Link
+            href="/search"
+            title={isCollapsed ? "Busca Avançada (/)" : undefined}
+            className={cn(
+              "flex w-full items-center rounded-lg text-sm font-medium transition-colors text-left",
+              isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
+              "text-zinc-400 hover:bg-zinc-900/80 hover:text-zinc-200"
+            )}
+          >
+            <Search className="h-4 w-4 shrink-0 text-zinc-500" />
+            {!isCollapsed && <span>Busca</span>}
+          </Link>
+
           {collections.map((col) => {
             const Icon = col.icon;
             const isActive = activeCollection === col.id;
