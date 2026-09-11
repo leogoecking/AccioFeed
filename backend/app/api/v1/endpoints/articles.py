@@ -23,13 +23,20 @@ async def get_articles(
         pattern="^(all|unread|favorite|saved|hidden|history)$",
         description="Filter by personal state collection",
     ),
-    search: str | None = Query(None, description="Search term in title or summary"),
+    search: str | None = Query(
+        None, max_length=200, description="Search term in title, summary, author or category"
+    ),
+    period: str | None = Query(
+        None, pattern="^(today|24h|7d|30d|all)$", description="Relative time period"
+    ),
     from_date: datetime | None = Query(
         None, alias="from", description="From published datetime (ISO)"
     ),
     to_date: datetime | None = Query(None, alias="to", description="To published datetime (ISO)"),
     sort: str = Query(
-        "recent", pattern="^(recent|popular|history|last_opened)$", description="Sort order"
+        "recent",
+        pattern="^(recent|popular|relevance|oldest|history|last_opened)$",
+        description="Sort order",
     ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
@@ -40,6 +47,7 @@ async def get_articles(
         source_slug=source,
         category=category,
         search=search,
+        period=period,
         from_date=from_date,
         to_date=to_date,
         sort=sort,

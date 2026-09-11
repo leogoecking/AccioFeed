@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import distinct, func, or_, select
+from sqlalchemy import case, distinct, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer, selectinload
 
@@ -58,6 +58,76 @@ class ArticleRepository:
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
+    def _is_postgres(self) -> bool:
+        bind = getattr(self.db, "bind", None)
+        if bind is None:
+            return False
+        dialect = getattr(bind, "dialect", None)
+        return getattr(dialect, "name", "") == "postgresql"
+
+    def _get_postgres_fts_expressions(self, search: str):
+        clean_search = search.strip()
+        char_a = literal_column("'A'::\"char\"")
+        char_b = literal_column("'B'::\"char\"")
+        char_c = literal_column("'C'::\"char\"")
+        char_d = literal_column("'D'::\"char\"")
+        regconfig_simple = literal_column("'simple'::regconfig")
+
+        tsvector_expr = (
+            func.setweight(
+                func.to_tsvector(
+                    regconfig_simple,
+                    func.immutable_unaccent(func.coalesce(Article.title, "")),
+                ),
+                char_a,
+            )
+            .op("||")(
+                func.setweight(
+                    func.to_tsvector(
+                        regconfig_simple,
+                        func.immutable_unaccent(func.coalesce(Article.summary, "")),
+                    ),
+                    char_b,
+                )
+            )
+            .op("||")(
+                func.setweight(
+                    func.to_tsvector(
+                        regconfig_simple,
+                        func.immutable_unaccent(
+                            func.coalesce(Article.author, "")
+                            + " "
+                            + func.coalesce(Article.category, "")
+                        ),
+                    ),
+                    char_c,
+                )
+            )
+            .op("||")(
+                func.setweight(
+                    func.to_tsvector(
+                        regconfig_simple,
+                        func.immutable_unaccent(
+                            func.coalesce(func.substring(Article.content, 1, 5000), "")
+                        ),
+                    ),
+                    char_d,
+                )
+            )
+        )
+        tsquery_expr = func.websearch_to_tsquery(
+            regconfig_simple, func.immutable_unaccent(clean_search)
+        )
+
+        # Precision bonus: if clean_search is matched in the title, boost relevance
+        title_match_bonus = case(
+            (func.immutable_unaccent(Article.title).ilike(f"%{clean_search}%"), 0.5),
+            else_=0.0,
+        )
+        combined_rank = func.ts_rank(tsvector_expr, tsquery_expr) + title_match_bonus
+
+        return tsvector_expr, tsquery_expr, combined_rank
+
     def _build_filter_stmt(
         self,
         stmt,
@@ -74,14 +144,21 @@ class ArticleRepository:
             stmt = stmt.join(Article.source).where(Source.slug == source_slug)
         if category and category.lower() != "all":
             stmt = stmt.where(Article.category == category.lower())
-        if search:
-            search_pattern = f"%{search.strip()}%"
-            stmt = stmt.where(
-                or_(
-                    Article.title.ilike(search_pattern),
-                    Article.summary.ilike(search_pattern),
+        if search and search.strip():
+            clean_search = search.strip()
+            if self._is_postgres():
+                tsvector_expr, tsquery_expr, _ = self._get_postgres_fts_expressions(clean_search)
+                stmt = stmt.where(tsvector_expr.op("@@")(tsquery_expr))
+            else:
+                search_pattern = f"%{clean_search}%"
+                stmt = stmt.where(
+                    or_(
+                        Article.title.ilike(search_pattern),
+                        Article.summary.ilike(search_pattern),
+                        Article.author.ilike(search_pattern),
+                        Article.category.ilike(search_pattern),
+                    )
                 )
-            )
         if from_date:
             stmt = stmt.where(Article.published_at >= from_date)
         if to_date:
@@ -157,7 +234,24 @@ class ArticleRepository:
             state_filter=state_filter,
         )
 
-        if sort == "popular":
+        has_search = bool(search and search.strip())
+
+        if has_search and sort in ("relevance", "recent", None):
+            # When searching without explicit non-relevance sort, order by relevance
+            if self._is_postgres():
+                _, _, combined_rank = self._get_postgres_fts_expressions(search.strip())  # type: ignore[union-attr]
+                stmt = stmt.order_by(combined_rank.desc(), Article.published_at.desc())
+            else:
+                search_pattern = f"%{search.strip()}%"  # type: ignore[union-attr]
+                title_match = case((Article.title.ilike(search_pattern), 1), else_=0)
+                stmt = stmt.order_by(title_match.desc(), Article.published_at.desc())
+        elif sort == "relevance":
+            stmt = stmt.order_by(Article.published_at.desc())
+        elif sort == "recent":
+            stmt = stmt.order_by(Article.published_at.desc())
+        elif sort == "oldest":
+            stmt = stmt.order_by(Article.published_at.asc())
+        elif sort == "popular":
             # Subquery to order by latest score
             score_subq = (
                 select(ArticleMetric.score)

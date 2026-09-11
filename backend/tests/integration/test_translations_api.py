@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +18,7 @@ from app.translation.base import (
 )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(scope="function")
 async def sample_article(db_session: AsyncSession):
     source_repo = SourceRepository(db_session)
     source = await source_repo.get_or_create(

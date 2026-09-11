@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ class ArticleService:
         source_slug: str | None = None,
         category: str | None = None,
         search: str | None = None,
+        period: str | None = None,
         from_date: datetime | None = None,
         to_date: datetime | None = None,
         sort: str = "recent",
@@ -32,6 +33,17 @@ class ArticleService:
         page_size: int = 20,
         state_filter: str | None = None,
     ) -> tuple[list[Article], int]:
+        if period and not from_date:
+            now = datetime.now(UTC)
+            if period == "today":
+                from_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif period == "24h":
+                from_date = now - timedelta(hours=24)
+            elif period == "7d":
+                from_date = now - timedelta(days=7)
+            elif period == "30d":
+                from_date = now - timedelta(days=30)
+
         total = await self.repo.count_articles(
             source_slug=source_slug,
             category=category,
