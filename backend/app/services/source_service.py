@@ -49,28 +49,37 @@ class SourceService:
         base_url: str | None = None,
         poll_interval_minutes: int = 15,
     ) -> Source:
-        # 1. Validate feed and SSRF
+        # 1. Sanitize and validate name
+        from app.core.ssrf import validate_url_ssrf
+        from app.sources.sanitizer import sanitize_text
+
+        clean_name = sanitize_text(name, max_length=100)
+        if not clean_name or len(clean_name) < 2:
+            raise ValueError("O nome da fonte deve conter pelo menos 2 caracteres válidos.")
+
+        # 2. Validate feed and SSRF
         preview = await self.validate_feed(feed_url)
 
-        # 2. Derive base_url from site_url or feed_url if not provided
-        if not base_url:
-            if preview.get("site_url"):
-                base_url = preview["site_url"]
-            else:
-                parsed = urllib.parse.urlparse(feed_url)
-                base_url = f"{parsed.scheme}://{parsed.netloc}"
+        # 3. Validate or derive base_url
+        if base_url and base_url.strip():
+            base_url = validate_url_ssrf(base_url.strip())
+        elif preview.get("site_url"):
+            base_url = preview["site_url"]
+        else:
+            parsed = urllib.parse.urlparse(feed_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
 
-        # 3. Generate unique slug
-        base_slug = slugify(name)
+        # 4. Generate unique slug
+        base_slug = slugify(clean_name)
         slug = base_slug
         counter = 1
         while await self.repo.get_by_slug(slug):
             counter += 1
             slug = f"{base_slug}-{counter}"
 
-        # 4. Create and persist
+        # 5. Create and persist
         source = Source(
-            name=name.strip(),
+            name=clean_name,
             slug=slug,
             type="rss",
             base_url=base_url,
@@ -89,6 +98,14 @@ class SourceService:
         poll_interval_minutes: int | None = None,
         is_active: bool | None = None,
     ) -> Source | None:
+        if name is not None:
+            from app.sources.sanitizer import sanitize_text
+
+            clean_name = sanitize_text(name, max_length=100)
+            if not clean_name or len(clean_name) < 2:
+                raise ValueError("O nome da fonte deve conter pelo menos 2 caracteres válidos.")
+            name = clean_name
+
         return await self.repo.update_source(
             source_id=source_id,
             name=name,

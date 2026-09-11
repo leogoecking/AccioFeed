@@ -1,7 +1,23 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+
+from app.sources.sanitizer import sanitize_text
+
+ALLOWED_SOURCE_CATEGORIES = {
+    "technology",
+    "dev",
+    "ai",
+    "hardware",
+    "science",
+    "linux",
+    "general",
+    "opensource",
+    "cybersecurity",
+    "startups",
+    "games",
+}
 
 
 class SourceBase(BaseModel):
@@ -26,6 +42,30 @@ class SourceCreateCustom(BaseModel):
     default_category: str = Field(default="technology", max_length=50)
     poll_interval_minutes: int = Field(default=15, ge=5, le=1440)
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        clean = sanitize_text(v, max_length=100)
+        if not clean or len(clean) < 2:
+            raise ValueError("O nome da fonte deve conter pelo menos 2 caracteres válidos.")
+        return clean
+
+    @field_validator("feed_url")
+    @classmethod
+    def validate_feed_url(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not (trimmed.startswith("http://") or trimmed.startswith("https://")):
+            raise ValueError("A URL do feed deve começar com http:// ou https://")
+        return trimmed
+
+    @field_validator("default_category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in ALLOWED_SOURCE_CATEGORIES:
+            return "technology"
+        return clean
+
 
 class SourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=100)
@@ -34,6 +74,26 @@ class SourceUpdate(BaseModel):
     is_active: bool | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def validate_update_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        clean = sanitize_text(v, max_length=100)
+        if not clean or len(clean) < 2:
+            raise ValueError("O nome da fonte deve conter pelo menos 2 caracteres válidos.")
+        return clean
+
+    @field_validator("default_category")
+    @classmethod
+    def validate_update_category(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        clean = v.strip().lower()
+        if clean not in ALLOWED_SOURCE_CATEGORIES:
+            return "technology"
+        return clean
 
 
 class SourceSimple(BaseModel):
@@ -70,6 +130,14 @@ class SourcePublic(SourceBase):
 
 class FeedValidateRequest(BaseModel):
     feed_url: str = Field(..., min_length=5, max_length=500)
+
+    @field_validator("feed_url")
+    @classmethod
+    def validate_feed_url(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not (trimmed.startswith("http://") or trimmed.startswith("https://")):
+            raise ValueError("A URL do feed deve começar com http:// ou https://")
+        return trimmed
 
 
 class FeedValidateResponse(BaseModel):

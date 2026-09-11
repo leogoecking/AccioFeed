@@ -197,3 +197,76 @@ async def test_sync_source_and_sync_all_endpoints(
         all_data = res_all.json()
         assert all_data["status"] == "success"
         assert all_data["sources_processed"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_source_sanitization_and_security_controls(async_client: AsyncClient):
+    sample_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0">
+        <channel>
+            <title>Safe RSS</title>
+            <link>https://saferss.org</link>
+            <item>
+                <title>Secure Post</title>
+                <link>https://saferss.org/post1</link>
+            </item>
+        </channel>
+    </rss>"""
+
+    with patch("app.sources.validator.safe_fetch_feed", new_callable=AsyncMock) as mock_fetch:
+        mock_fetch.return_value = sample_xml
+
+        # 1. HTML script tag in name should be stripped and sanitized
+        res = await async_client.post(
+            "/api/v1/sources",
+            json={
+                "name": "<script>alert('xss')</script>Safe Feed",
+                "feed_url": "https://saferss.org/feed.xml",
+                "default_category": "unknown_cat",
+            },
+        )
+        assert res.status_code == 201
+        data = res.json()
+        assert data["name"] == "Safe Feed"
+        assert "<script>" not in data["name"]
+        # Unknown category normalized to fallback
+        assert data["default_category"] == "technology"
+
+        # 2. Name that consists entirely of malicious tags must be rejected (422)
+        res_empty = await async_client.post(
+            "/api/v1/sources",
+            json={
+                "name": "<script>alert(1)</script>",
+                "feed_url": "https://saferss.org/feed.xml",
+            },
+        )
+        assert res_empty.status_code == 422
+
+        # 3. Disallowed protocols in feed_url must be rejected with 422
+        res_proto = await async_client.post(
+            "/api/v1/sources",
+            json={
+                "name": "Evil Proto",
+                "feed_url": "javascript:alert(1)",
+            },
+        )
+        assert res_proto.status_code == 422
+
+        # 4. Disallowed protocol in validate_feed must also return 422
+        res_val_proto = await async_client.post(
+            "/api/v1/sources/validate",
+            json={"feed_url": "ftp://example.com/feed.xml"},
+        )
+        assert res_val_proto.status_code == 422
+
+        # 5. Malicious private base_url must be rejected with 400 (SSRF)
+        res_ssrf_base = await async_client.post(
+            "/api/v1/sources",
+            json={
+                "name": "SSRF Base Test",
+                "feed_url": "https://saferss.org/feed.xml",
+                "base_url": "http://127.0.0.1:8000",
+            },
+        )
+        assert res_ssrf_base.status_code == 400
+        assert "SSRF" in res_ssrf_base.json()["detail"]

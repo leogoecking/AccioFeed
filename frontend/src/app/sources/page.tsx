@@ -453,6 +453,7 @@ export default function SourcesPage() {
                   <input
                     type="url"
                     required
+                    maxLength={500}
                     placeholder="https://exemplo.com/feed.xml"
                     value={feedUrl}
                     onChange={(e) => setFeedUrl(e.target.value)}
@@ -468,7 +469,7 @@ export default function SourcesPage() {
                   </button>
                 </div>
                 <p className="text-[11px] text-zinc-500 mt-1">
-                  Proteção integrada contra SSRF: apenas endereços públicos são aceitos.
+                  Proteção integrada contra SSRF: apenas endereços públicos são aceitos (máx. 500 caracteres).
                 </p>
               </div>
 
@@ -507,6 +508,8 @@ export default function SourcesPage() {
                 <input
                   type="text"
                   required
+                  minLength={2}
+                  maxLength={100}
                   placeholder="Ex: Phoronix Linux"
                   value={sourceName}
                   onChange={(e) => setSourceName(e.target.value)}
