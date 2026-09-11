@@ -176,21 +176,21 @@ export default function SourcesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-30">
+      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur sticky top-0 z-30">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-700 hover:text-slate-100 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Voltar à Timeline</span>
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-slate-100">Gerenciamento de Fontes</h1>
-              <p className="text-xs text-slate-400">Ative, configure e adicione feeds RSS personalizados</p>
+              <h1 className="text-xl font-bold text-zinc-100">Gerenciamento de Fontes</h1>
+              <p className="text-xs text-zinc-400">Ative, configure e adicione feeds RSS personalizados</p>
             </div>
           </div>
 
@@ -198,10 +198,10 @@ export default function SourcesPage() {
             <button
               onClick={handleSyncAll}
               disabled={isSyncingAll}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-50 transition-all"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50 transition-all"
               title="Sincronizar todas as fontes ativas"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? "animate-spin text-cyan-400" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? "animate-spin text-rose-400" : ""}`} />
               <span>{isSyncingAll ? "Sincronizando..." : "Sincronizar Todas"}</span>
             </button>
 
@@ -211,7 +211,7 @@ export default function SourcesPage() {
                 setValidationError(null);
                 setValidationResult(null);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold px-3 py-2 text-xs transition-all shadow-md shadow-cyan-950/30"
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-zinc-950 font-semibold px-3 py-2 text-xs transition-all shadow-md shadow-rose-950/30"
             >
               <Plus className="h-4 w-4" />
               <span>Adicionar RSS</span>
@@ -230,26 +230,26 @@ export default function SourcesPage() {
                 ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
                 : feedbackMessage.type === "error"
                 ? "border-rose-500/30 bg-rose-950/20 text-rose-300"
-                : "border-cyan-500/30 bg-cyan-950/20 text-cyan-300"
+                : "border-rose-500/30 bg-rose-950/20 text-rose-300"
             }`}
           >
             <span>{feedbackMessage.text}</span>
-            <button onClick={() => setFeedbackMessage(null)} className="text-slate-400 hover:text-slate-200">
+            <button onClick={() => setFeedbackMessage(null)} className="text-zinc-400 hover:text-zinc-200">
               <X className="h-4 w-4" />
             </button>
           </div>
         )}
 
         {isLoading ? (
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center animate-pulse">
-            <p className="text-slate-400 text-sm">Carregando fontes cadastradas...</p>
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-12 text-center animate-pulse">
+            <p className="text-zinc-400 text-sm">Carregando fontes cadastradas...</p>
           </div>
         ) : sources.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center space-y-4">
-            <Globe className="mx-auto h-10 w-10 text-slate-600" />
+          <div className="rounded-2xl border border-dashed border-zinc-800 p-12 text-center space-y-4">
+            <Globe className="mx-auto h-10 w-10 text-zinc-600" />
             <div className="space-y-1">
-              <p className="text-slate-300 font-medium">Nenhuma fonte cadastrada encontrada no banco de dados.</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-zinc-300 font-medium">Nenhuma fonte cadastrada encontrada no banco de dados.</p>
+              <p className="text-xs text-zinc-500">
                 Você pode sincronizar para carregar as fontes padrão ou adicionar seu primeiro feed RSS manualmente.
               </p>
             </div>
@@ -257,7 +257,7 @@ export default function SourcesPage() {
               <button
                 onClick={handleSyncAll}
                 disabled={isSyncingAll}
-                className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-500 disabled:opacity-50 transition-colors shadow-lg shadow-cyan-950/40"
+                className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-rose-500 disabled:opacity-50 transition-colors shadow-lg shadow-rose-950/40"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? "animate-spin" : ""}`} />
                 <span>{isSyncingAll ? "Sincronizando..." : "Sincronizar Fontes Padrão"}</span>
@@ -268,7 +268,7 @@ export default function SourcesPage() {
                   setValidationError(null);
                   setValidationResult(null);
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-800 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Adicionar RSS Manual</span>
@@ -280,10 +280,10 @@ export default function SourcesPage() {
             </div>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50">
+          <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <table className="w-full text-left text-xs text-zinc-300">
+                <thead className="border-b border-zinc-800 bg-zinc-950/60 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                   <tr>
                     <th className="px-6 py-4">Fonte</th>
                     <th className="px-6 py-4">Categoria</th>
@@ -294,13 +294,13 @@ export default function SourcesPage() {
                     <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-zinc-800/60">
                   {sources.map((source) => {
                     const badgeMeta = getSourceBadge(source.slug);
                     const catMeta = getCategoryBadge(source.default_category);
 
                     return (
-                      <tr key={source.id} className="hover:bg-slate-900/80 transition-colors">
+                      <tr key={source.id} className="hover:bg-zinc-900/80 transition-colors">
                         {/* Name & URL */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -310,19 +310,19 @@ export default function SourcesPage() {
                               {source.type === "hacker_news" ? "API" : "RSS"}
                             </span>
                             <div>
-                              <div className="font-semibold text-slate-100 flex items-center gap-1.5">
+                              <div className="font-semibold text-zinc-100 flex items-center gap-1.5">
                                 <span>{source.name}</span>
                                 <a
                                   href={source.base_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-slate-500 hover:text-cyan-400"
+                                  className="text-zinc-500 hover:text-rose-400"
                                   title="Visitar website"
                                 >
                                   <ExternalLink className="h-3 w-3" />
                                 </a>
                               </div>
-                              <span className="text-[11px] text-slate-500 truncate max-w-xs block">
+                              <span className="text-[11px] text-zinc-500 truncate max-w-xs block">
                                 {source.feed_url || source.base_url}
                               </span>
                             </div>
@@ -339,8 +339,8 @@ export default function SourcesPage() {
                         {/* Status */}
                         <td className="px-6 py-4">
                           {source.status === "disabled" ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-2.5 py-0.5 text-[11px] text-slate-500">
-                              <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-0.5 text-[11px] text-zinc-500">
+                              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
                               Desativada
                             </span>
                           ) : source.status === "error" ? (
@@ -364,23 +364,23 @@ export default function SourcesPage() {
                         </td>
 
                         {/* Last Poll */}
-                        <td className="px-6 py-4 text-slate-400">
+                        <td className="px-6 py-4 text-zinc-400">
                           {source.last_polled_at ? (
                             <div className="space-y-0.5">
                               <span>{formatRelativeTime(source.last_polled_at)}</span>
                               {source.last_success_at && (
-                                <span className="text-[10px] text-slate-500 block">
+                                <span className="text-[10px] text-zinc-500 block">
                                   Sucesso: {formatRelativeTime(source.last_success_at)}
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-slate-600 italic">Pendente</span>
+                            <span className="text-zinc-600 italic">Pendente</span>
                           )}
                         </td>
 
                         {/* Interval */}
-                        <td className="px-6 py-4 font-mono text-slate-400">
+                        <td className="px-6 py-4 font-mono text-zinc-400">
                           {source.poll_interval_minutes} min
                         </td>
 
@@ -390,12 +390,12 @@ export default function SourcesPage() {
                             type="button"
                             onClick={() => handleToggleActive(source)}
                             className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              source.is_active ? "bg-cyan-500" : "bg-slate-800"
+                              source.is_active ? "bg-rose-500" : "bg-zinc-800"
                             }`}
                           >
                             <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-slate-950 shadow ring-0 transition duration-200 ease-in-out ${
-                                source.is_active ? "translate-x-4" : "translate-x-0"
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-zinc-950 shadow ring-0 transition duration-200 ease-in-out ${
+                                source.is_active ? "tranzinc-x-4" : "tranzinc-x-0"
                               }`}
                             />
                           </button>
@@ -406,11 +406,11 @@ export default function SourcesPage() {
                           <button
                             onClick={() => handleSyncSource(source)}
                             disabled={syncingSourceId === source.id || !source.is_active}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-slate-300 hover:border-slate-700 hover:text-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-zinc-300 hover:border-zinc-700 hover:text-rose-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             title="Sincronizar fonte individual"
                           >
                             <RefreshCw
-                              className={`h-3 w-3 ${syncingSourceId === source.id ? "animate-spin text-cyan-400" : ""}`}
+                              className={`h-3 w-3 ${syncingSourceId === source.id ? "animate-spin text-rose-400" : ""}`}
                             />
                             <span>Sync</span>
                           </button>
@@ -428,16 +428,16 @@ export default function SourcesPage() {
       {/* Add Custom Source Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 sm:p-8 space-y-6 shadow-2xl">
+          <div className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 sm:p-8 space-y-6 shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                <Globe className="h-5 w-5 text-cyan-400" />
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+              <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
+                <Globe className="h-5 w-5 text-rose-400" />
                 <span>Adicionar Feed RSS/Atom</span>
               </h2>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -446,7 +446,7 @@ export default function SourcesPage() {
             <form onSubmit={handleCreateSource} className="space-y-4">
               {/* Feed URL + Validate Button */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                   URL do Feed RSS ou Atom <span className="text-rose-400">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -456,18 +456,18 @@ export default function SourcesPage() {
                     placeholder="https://exemplo.com/feed.xml"
                     value={feedUrl}
                     onChange={(e) => setFeedUrl(e.target.value)}
-                    className="flex-1 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none"
+                    className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-rose-500 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleValidateFeed}
                     disabled={isValidating || !feedUrl.trim()}
-                    className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                    className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
                   >
                     {isValidating ? "Validando..." : "Validar"}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-zinc-500 mt-1">
                   Proteção integrada contra SSRF: apenas endereços públicos são aceitos.
                 </p>
               </div>
@@ -487,12 +487,12 @@ export default function SourcesPage() {
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Feed válido ({validationResult.format.toUpperCase()})</span>
                   </div>
-                  <p className="text-slate-200 font-medium">{validationResult.title}</p>
-                  <p className="text-slate-400">
+                  <p className="text-zinc-200 font-medium">{validationResult.title}</p>
+                  <p className="text-zinc-400">
                     {validationResult.articles_count} artigos detectados no feed.
                   </p>
                   {validationResult.latest_article_title && (
-                    <p className="text-slate-500 text-[11px] truncate">
+                    <p className="text-zinc-500 text-[11px] truncate">
                       Último: {validationResult.latest_article_title}
                     </p>
                   )}
@@ -501,7 +501,7 @@ export default function SourcesPage() {
 
               {/* Source Name */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                   Nome da Fonte <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -510,20 +510,20 @@ export default function SourcesPage() {
                   placeholder="Ex: Phoronix Linux"
                   value={sourceName}
                   onChange={(e) => setSourceName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-cyan-500 focus:outline-none"
+                  className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-rose-500 focus:outline-none"
                 />
               </div>
 
               {/* Category & Poll Interval Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                     Categoria Padrão
                   </label>
                   <select
                     value={sourceCategory}
                     onChange={(e) => setSourceCategory(e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 focus:border-rose-500 focus:outline-none"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat.id} value={cat.id}>
@@ -534,13 +534,13 @@ export default function SourcesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
                     Intervalo de Coleta
                   </label>
                   <select
                     value={pollInterval}
                     onChange={(e) => setPollInterval(parseInt(e.target.value, 10))}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-cyan-500 focus:outline-none"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 focus:border-rose-500 focus:outline-none"
                   >
                     <option value={10}>10 minutos</option>
                     <option value={15}>15 minutos</option>
@@ -552,18 +552,18 @@ export default function SourcesPage() {
               </div>
 
               {/* Modal Actions */}
-              <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-4 border-t border-zinc-800 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="rounded-lg px-4 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                  className="rounded-lg px-4 py-2 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving || !sourceName.trim() || !feedUrl.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold px-4 py-2 text-xs disabled:opacity-50 transition-all shadow-md shadow-cyan-950/40"
+                  className="inline-flex items-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-zinc-950 font-semibold px-4 py-2 text-xs disabled:opacity-50 transition-all shadow-md shadow-rose-950/40"
                 >
                   {isSaving ? "Salvando..." : "Cadastrar Fonte"}
                 </button>

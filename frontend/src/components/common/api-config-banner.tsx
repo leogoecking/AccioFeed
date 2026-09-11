@@ -58,16 +58,16 @@ export function ApiConfigBanner({ onConnected }: ApiConfigBannerProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-cyan-500/30 bg-slate-900/90 p-5 shadow-2xl backdrop-blur-md space-y-4">
+    <div className="rounded-2xl border border-rose-500/30 bg-zinc-900/90 p-5 shadow-2xl backdrop-blur-md space-y-4">
       <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-cyan-500/10 p-2 text-cyan-400">
+        <div className="rounded-lg bg-rose-500/10 p-2 text-rose-400">
           <Server className="h-5 w-5" />
         </div>
         <div className="flex-1 space-y-1">
-          <h3 className="text-sm font-semibold text-slate-100">
+          <h3 className="text-sm font-semibold text-zinc-100">
             Conexão com a API do Backend
           </h3>
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-zinc-400 leading-relaxed">
             No Render Free Tier, informe a URL pública HTTPS da sua API (exibida no painel do Render no serviço <code>technewshub-api</code>):
           </p>
         </div>
@@ -75,19 +75,19 @@ export function ApiConfigBanner({ onConnected }: ApiConfigBannerProps) {
 
       <form onSubmit={handleTestAndSave} className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Globe className="absolute left-3 top-1/2 h-4 w-4 -tranzinc-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={apiUrl}
             onChange={(e) => setApiUrl(e.target.value)}
             placeholder="https://technewshub-api.onrender.com"
-            className="w-full rounded-lg border border-slate-800 bg-slate-950/80 pl-9 pr-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-600 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 pl-9 pr-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-600 outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/30"
           />
         </div>
         <button
           type="submit"
           disabled={isTesting || !apiUrl.trim()}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 transition-all disabled:opacity-50 shadow-md shadow-cyan-950"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition-all disabled:opacity-50 shadow-md shadow-rose-950"
         >
           {isTesting ? (
             <>
@@ -107,7 +107,7 @@ export function ApiConfigBanner({ onConnected }: ApiConfigBannerProps) {
               ? "border border-emerald-500/30 bg-emerald-950/30 text-emerald-300"
               : statusMessage.type === "error"
               ? "border border-rose-500/30 bg-rose-950/30 text-rose-300"
-              : "border border-cyan-500/30 bg-cyan-950/30 text-cyan-300"
+              : "border border-rose-500/30 bg-rose-950/30 text-rose-300"
           }`}
         >
           {statusMessage.type === "success" ? (

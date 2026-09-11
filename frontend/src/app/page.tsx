@@ -28,6 +28,35 @@ function DashboardContent() {
   const [page, setPage] = useState(initialPage);
   const [sources, setSources] = useState<SourcePublic[]>([]);
   const [stats, setStats] = useState<LibraryStats>({ unread: 0, saved: 0, favorites: 0, total: 0 });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshStatusText, setRefreshStatusText] = useState<string | null>(null);
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
+
+  // Read sidebar preference from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("acciofeed_sidebar_collapsed");
+      if (saved !== null) {
+        setIsSidebarCollapsed(saved === "true");
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("acciofeed_sidebar_collapsed", String(next));
+      } catch {
+        // Ignore localStorage errors
+      }
+      return next;
+    });
+  };
 
   // Sync state to URL params
   const updateUrlParams = (
@@ -54,6 +83,35 @@ function DashboardContent() {
   const loadStats = async () => {
     const st = await fetchLibraryStats();
     setStats(st);
+  };
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRefreshStatusText("Atualizando...");
+    try {
+      const { syncAllSources } = await import("@/lib/api");
+      const res = await syncAllSources(true);
+      const [sourcesData, statsData] = await Promise.all([
+        fetchSources(true),
+        fetchLibraryStats(),
+      ]);
+      setSources(sourcesData);
+      setStats(statsData);
+      setTimelineRefreshKey((k) => k + 1);
+
+      if (res.new_articles > 0) {
+        setRefreshStatusText(`${res.new_articles} novas notícias`);
+      } else {
+        setRefreshStatusText("Tudo atualizado");
+      }
+    } catch (err) {
+      console.error("Refresh failed:", err);
+      setRefreshStatusText("Falha ao atualizar");
+    } finally {
+      setIsRefreshing(false);
+      setTimeout(() => setRefreshStatusText(null), 3500);
+    }
   };
 
   useEffect(() => {
@@ -107,13 +165,19 @@ function DashboardContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950">
+    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <Header
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        refreshStatusText={refreshStatusText}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={toggleSidebar}
+        onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
       />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:flex-row lg:px-8">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-3 py-6 sm:px-6 lg:flex-row lg:px-8">
         <Sidebar
           activeCategory={activeCategory}
           onSelectCategory={handleCategorySelect}
@@ -123,9 +187,13 @@ function DashboardContent() {
           activeSource={activeSource}
           onSelectSource={handleSourceSelect}
           stats={stats}
+          isCollapsed={isSidebarCollapsed}
+          isMobileOpen={isMobileMenuOpen}
+          onCloseMobile={() => setIsMobileMenuOpen(false)}
         />
 
         <Timeline
+          key={timelineRefreshKey}
           activeCategory={activeCategory}
           activeCollection={activeCollection}
           activeSource={activeSource}

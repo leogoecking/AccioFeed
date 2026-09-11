@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tech News Hub — Agregador Inteligente de Notícias",
+  title: "AccioFeed_ — Leitor Pessoal de Tecnologia",
   description:
-    "Agregador self-hosted moderno de notícias sobre IA, Hardware, Dev, Linux, Open Source e Tecnologia.",
+    "Agregador e leitor pessoal de tecnologia focado em velocidade, legibilidade editorial e baixo ruído.",
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-slate-950 font-sans text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-300`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-zinc-950 font-sans text-zinc-100 antialiased selection:bg-rose-500/30 selection:text-rose-200`}
       >
         {children}
       </body>
