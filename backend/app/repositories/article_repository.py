@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import defer, selectinload
 
 from app.models.article import Article
 from app.models.article_metric import ArticleMetric
@@ -142,6 +142,7 @@ class ArticleRepository:
         state_filter: str | None = None,
     ) -> list[Article]:
         stmt = select(Article).options(
+            defer(Article.content),
             selectinload(Article.source),
             selectinload(Article.metrics),
             selectinload(Article.state),

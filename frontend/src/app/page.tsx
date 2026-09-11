@@ -21,7 +21,8 @@ function DashboardContent() {
   const initialSearch = searchParams.get("search") || "";
   const initialSort = (searchParams.get("sort") as "recent" | "popular" | "history" | "last_opened") || "recent";
 
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(initialSearch);
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [activeSource, setActiveSource] = useState<string | null>(initialSource);
   const [activeCollection, setActiveCollection] = useState<string>(initialState);
@@ -146,32 +147,59 @@ function DashboardContent() {
     loadData();
   }, []);
 
+  // 300ms search debouncing to eliminate redundant API requests (Milestone 5)
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      if (debouncedSearchQuery) {
+        setDebouncedSearchQuery("");
+        updateUrlParams(activeCategory, activeSource, activeCollection, "", sort);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchInput.trim());
+      updateUrlParams(activeCategory, activeSource, activeCollection, searchInput.trim(), sort);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleCollectionSelect = (col: string) => {
     setActiveCollection(col);
     const targetSort = col === "history" ? "history" : "recent";
     setSort(targetSort);
-    updateUrlParams(activeCategory, activeSource, col, searchQuery, targetSort);
+    updateUrlParams(activeCategory, activeSource, col, debouncedSearchQuery, targetSort);
   };
 
   const handleCategorySelect = (cat: string) => {
     setActiveCategory(cat);
     setActiveSource(null);
-    updateUrlParams(cat, null, activeCollection, searchQuery, sort);
+    updateUrlParams(cat, null, activeCollection, debouncedSearchQuery, sort);
   };
 
   const handleSourceSelect = (src: string | null) => {
     setActiveSource(src);
-    updateUrlParams(activeCategory, src, activeCollection, searchQuery, sort);
+    updateUrlParams(activeCategory, src, activeCollection, debouncedSearchQuery, sort);
   };
 
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+    setSearchInput(query);
+    if (!query.trim()) {
+      setDebouncedSearchQuery("");
+      updateUrlParams(activeCategory, activeSource, activeCollection, "", sort);
+    }
+  };
+
+  const handleSearchImmediate = (query: string) => {
+    setSearchInput(query);
+    setDebouncedSearchQuery(query);
     updateUrlParams(activeCategory, activeSource, activeCollection, query, sort);
   };
 
   const handleSortChange = (newSort: "recent" | "popular" | "history" | "last_opened") => {
     setSort(newSort);
-    updateUrlParams(activeCategory, activeSource, activeCollection, searchQuery, newSort);
+    updateUrlParams(activeCategory, activeSource, activeCollection, debouncedSearchQuery, newSort);
   };
 
   const handleRefreshRef = useRef(handleRefresh);
@@ -214,7 +242,7 @@ function DashboardContent() {
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <Header
-        searchQuery={searchQuery}
+        searchQuery={searchInput}
         onSearchChange={handleSearchChange}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
@@ -248,7 +276,7 @@ function DashboardContent() {
           activeCollection={activeCollection}
           activeSource={activeSource}
           onSourceChange={handleSourceSelect}
-          searchQuery={searchQuery}
+          searchQuery={debouncedSearchQuery}
           onSearchChange={handleSearchChange}
           sort={sort}
           onSortChange={handleSortChange}
@@ -258,7 +286,8 @@ function DashboardContent() {
             setActiveCategory("all");
             setActiveSource(null);
             setActiveCollection("all");
-            setSearchQuery("");
+            setSearchInput("");
+            setDebouncedSearchQuery("");
             setSort("recent");
             updateUrlParams("all", null, "all", "", "recent");
           }}
@@ -271,7 +300,7 @@ function DashboardContent() {
         onClose={() => setIsCommandPaletteOpen(false)}
         onSelectCollection={handleCollectionSelect}
         onSelectCategory={handleCategorySelect}
-        onSearch={handleSearchChange}
+        onSearch={handleSearchImmediate}
         onRefresh={handleRefresh}
         currentDensity={density}
         onToggleDensity={handleToggleDensity}

@@ -84,7 +84,9 @@ class ArticlePublic(BaseModel):
                 "source": data.source,
                 "author": getattr(data, "author", None),
                 "summary": getattr(data, "summary", None),
-                "content": getattr(data, "content", None),
+                "content": data.__dict__.get("content")
+                if hasattr(data, "__dict__")
+                else getattr(data, "content", None),
                 "image_url": getattr(data, "image_url", None),
                 "published_at": data.published_at,
                 "collected_at": getattr(data, "collected_at", None),
