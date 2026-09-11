@@ -12,10 +12,11 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { fetchArticles, syncAllSources } from "@/lib/api";
+import { fetchArticles, syncAllSources, updateArticleState } from "@/lib/api";
 import { ArticleFilters, ArticlePublic, ArticleStatePublic } from "@/lib/types";
 import { ArticleCard } from "./article-card";
 import { ArticleModal } from "./article-modal";
+import { QuickPreview } from "@/components/navigation/quick-preview";
 import { ApiConfigBanner } from "@/components/common/api-config-banner";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,8 @@ interface TimelineProps {
   onSortChange: (sort: "recent" | "popular" | "history" | "last_opened") => void;
   onResetFilters?: () => void;
   onStatsRefresh?: () => void;
+  density?: ViewDensity;
+  onDensityChange?: (density: ViewDensity) => void;
 }
 
 export function Timeline({
@@ -47,6 +50,8 @@ export function Timeline({
   onSortChange,
   onResetFilters,
   onStatsRefresh,
+  density: propDensity,
+  onDensityChange: onPropDensityChange,
 }: TimelineProps) {
   const [articles, setArticles] = useState<ArticlePublic[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -60,7 +65,12 @@ export function Timeline({
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Density preference
-  const [density, setDensity] = useState<ViewDensity>("comfortable");
+  const [internalDensity, setInternalDensity] = useState<ViewDensity>("comfortable");
+  const density = propDensity ?? internalDensity;
+
+  // Power Navigation States (Milestone 4)
+  const [selectedNavIndex, setSelectedNavIndex] = useState(0);
+  const [quickPreviewArticle, setQuickPreviewArticle] = useState<ArticlePublic | null>(null);
 
   // "Novas desde a última visita" state
   const [lastVisitAt, setLastVisitAt] = useState<string | null>(null);
@@ -75,7 +85,8 @@ export function Timeline({
       // Density
       const savedDensity = localStorage.getItem("acciofeed_density") as ViewDensity | null;
       if (savedDensity === "comfortable" || savedDensity === "compact") {
-        setDensity(savedDensity);
+        setInternalDensity(savedDensity);
+        onPropDensityChange?.(savedDensity);
       }
 
       // Last visit timestamp
@@ -91,10 +102,11 @@ export function Timeline({
     } catch {
       // Ignore localStorage errors
     }
-  }, []);
+  }, [onPropDensityChange]);
 
   const handleDensityChange = (newDensity: ViewDensity) => {
-    setDensity(newDensity);
+    setInternalDensity(newDensity);
+    onPropDensityChange?.(newDensity);
     try {
       localStorage.setItem("acciofeed_density", newDensity);
     } catch {
@@ -147,6 +159,7 @@ export function Timeline({
         setArticles(res.items);
         setTotalCount(res.total);
         setTotalPages(res.pages);
+        setSelectedNavIndex(0);
         if (res.items.length > 0) {
           latestArticleIdRef.current = res.items[0].id;
         }
@@ -265,6 +278,13 @@ export function Timeline({
         return prev;
       });
 
+      setQuickPreviewArticle((prev) => {
+        if (prev && prev.id === articleId) {
+          return { ...prev, state: { ...prev.state, ...newState } };
+        }
+        return prev;
+      });
+
       onStatsRefresh?.();
     },
     [onStatsRefresh]
@@ -276,14 +296,141 @@ export function Timeline({
       if (selectedArticle?.id === articleId) {
         setSelectedArticle(null);
       }
+      if (quickPreviewArticle?.id === articleId) {
+        setQuickPreviewArticle(null);
+      }
       onStatsRefresh?.();
     },
-    [selectedArticle, onStatsRefresh]
+    [selectedArticle, quickPreviewArticle, onStatsRefresh]
   );
 
   const handleCloseModal = useCallback(() => {
     setSelectedArticle(null);
   }, []);
+
+  // Sync quickPreviewArticle when articles array changes
+  useEffect(() => {
+    if (quickPreviewArticle) {
+      const updated = articles.find((a) => a.id === quickPreviewArticle.id);
+      if (updated) {
+        setQuickPreviewArticle(updated);
+      }
+    }
+  }, [articles, quickPreviewArticle]);
+
+  // Global Keyboard Navigation (Milestone 4)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Guard: Ignore if user is inside an input, textarea, select, or contenteditable
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // If Reader modal is currently open, let ArticleModal handle its own keys
+      if (selectedArticle) {
+        return;
+      }
+
+      // If no articles loaded, ignore
+      if (articles.length === 0) return;
+
+      if (e.key === "j") {
+        e.preventDefault();
+        setSelectedNavIndex((prev) => {
+          const next = prev < articles.length - 1 ? prev + 1 : 0;
+          const el = document.querySelector(`[data-article-id="${articles[next]?.id}"]`);
+          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          if (quickPreviewArticle) {
+            setQuickPreviewArticle(articles[next]);
+          }
+          return next;
+        });
+      } else if (e.key === "k") {
+        e.preventDefault();
+        setSelectedNavIndex((prev) => {
+          const prevIdx = prev > 0 ? prev - 1 : articles.length - 1;
+          const el = document.querySelector(`[data-article-id="${articles[prevIdx]?.id}"]`);
+          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          if (quickPreviewArticle) {
+            setQuickPreviewArticle(articles[prevIdx]);
+          }
+          return prevIdx;
+        });
+      } else if (e.key === "Enter" || e.key === "o") {
+        e.preventDefault();
+        const activeArt =
+          selectedNavIndex >= 0 && selectedNavIndex < articles.length
+            ? articles[selectedNavIndex]
+            : articles[0];
+        if (activeArt) {
+          setQuickPreviewArticle(null);
+          setSelectedArticle(activeArt);
+        }
+      } else if (e.key === " " || e.key === "p") {
+        e.preventDefault();
+        const activeArt =
+          selectedNavIndex >= 0 && selectedNavIndex < articles.length
+            ? articles[selectedNavIndex]
+            : articles[0];
+        if (activeArt) {
+          if (quickPreviewArticle?.id === activeArt.id) {
+            setQuickPreviewArticle(null);
+          } else {
+            setQuickPreviewArticle(activeArt);
+            if (selectedNavIndex < 0) setSelectedNavIndex(0);
+          }
+        }
+      } else if (e.key === "s") {
+        const activeArt =
+          selectedNavIndex >= 0 && selectedNavIndex < articles.length
+            ? articles[selectedNavIndex]
+            : null;
+        if (activeArt) {
+          e.preventDefault();
+          const nextVal = !activeArt.state?.is_saved;
+          handleArticleStateChange(activeArt.id, { is_saved: nextVal });
+          updateArticleState(activeArt.id, { is_saved: nextVal });
+        }
+      } else if (e.key === "f") {
+        const activeArt =
+          selectedNavIndex >= 0 && selectedNavIndex < articles.length
+            ? articles[selectedNavIndex]
+            : null;
+        if (activeArt) {
+          e.preventDefault();
+          const nextVal = !activeArt.state?.is_favorite;
+          handleArticleStateChange(activeArt.id, { is_favorite: nextVal });
+          updateArticleState(activeArt.id, { is_favorite: nextVal });
+        }
+      } else if (e.key === "m") {
+        const activeArt =
+          selectedNavIndex >= 0 && selectedNavIndex < articles.length
+            ? articles[selectedNavIndex]
+            : null;
+        if (activeArt) {
+          e.preventDefault();
+          const nextVal = !activeArt.state?.is_read;
+          handleArticleStateChange(activeArt.id, { is_read: nextVal });
+          updateArticleState(activeArt.id, { is_read: nextVal });
+        }
+      } else if (e.key === "Escape") {
+        if (quickPreviewArticle) {
+          e.preventDefault();
+          setQuickPreviewArticle(null);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [articles, selectedNavIndex, quickPreviewArticle, selectedArticle, handleArticleStateChange]);
 
   const getHeading = () => {
     if (activeCollection === "unread") return "Não Lidos";
@@ -611,7 +758,15 @@ export function Timeline({
                     article={article}
                     density={density}
                     isNewSinceLastVisit={isNew}
-                    onSelect={(art) => setSelectedArticle(art)}
+                    isSelected={selectedNavIndex === index}
+                    onSelect={(art) => {
+                      setSelectedNavIndex(index);
+                      setSelectedArticle(art);
+                    }}
+                    onQuickPreview={(art) => {
+                      setSelectedNavIndex(index);
+                      setQuickPreviewArticle(art);
+                    }}
                     onStateChange={handleArticleStateChange}
                     onHide={handleArticleHide}
                   />
@@ -650,6 +805,20 @@ export function Timeline({
             </div>
           )}
         </div>
+      )}
+
+      {/* Quick Preview Slide-over (Milestone 4) */}
+      {quickPreviewArticle && (
+        <QuickPreview
+          article={quickPreviewArticle}
+          onClose={() => setQuickPreviewArticle(null)}
+          onOpenReader={(art) => {
+            setQuickPreviewArticle(null);
+            setSelectedArticle(art);
+          }}
+          onStateChange={handleArticleStateChange}
+          onHide={handleArticleHide}
+        />
       )}
 
       {/* Article Reader Modal */}

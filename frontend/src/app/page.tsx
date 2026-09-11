@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Timeline } from "@/components/articles/timeline";
+import { Timeline, ViewDensity } from "@/components/articles/timeline";
+import { CommandPalette } from "@/components/navigation/command-palette";
+import { ShortcutsHelpModal } from "@/components/navigation/shortcuts-help-modal";
 import { fetchLibraryStats, fetchSources } from "@/lib/api";
 import { LibraryStats, SourcePublic } from "@/lib/types";
 
@@ -32,17 +34,39 @@ function DashboardContent() {
   const [refreshStatusText, setRefreshStatusText] = useState<string | null>(null);
   const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
 
-  // Read sidebar preference from localStorage
+  // Power Navigation Modals & Density
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const [density, setDensity] = useState<ViewDensity>("comfortable");
+
+  // Read sidebar preference & density from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("acciofeed_sidebar_collapsed");
-      if (saved !== null) {
-        setIsSidebarCollapsed(saved === "true");
+      const savedSidebar = localStorage.getItem("acciofeed_sidebar_collapsed");
+      if (savedSidebar !== null) {
+        setIsSidebarCollapsed(savedSidebar === "true");
+      }
+
+      const savedDensity = localStorage.getItem("acciofeed_density") as ViewDensity | null;
+      if (savedDensity === "comfortable" || savedDensity === "compact") {
+        setDensity(savedDensity);
       }
     } catch {
       // Ignore localStorage errors
     }
   }, []);
+
+  const handleToggleDensity = () => {
+    setDensity((prev) => {
+      const next = prev === "compact" ? "comfortable" : "compact";
+      try {
+        localStorage.setItem("acciofeed_density", next);
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  };
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed((prev) => {
@@ -150,6 +174,43 @@ function DashboardContent() {
     updateUrlParams(activeCategory, activeSource, activeCollection, searchQuery, newSort);
   };
 
+  const handleRefreshRef = useRef(handleRefresh);
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  });
+
+  // Global system shortcuts (Cmd+K / Ctrl+K, ?, r)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable);
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setIsShortcutsHelpOpen(true);
+      } else if (e.key === "r") {
+        e.preventDefault();
+        handleRefreshRef.current();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <Header
@@ -161,6 +222,8 @@ function DashboardContent() {
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={toggleSidebar}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
       />
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-3 py-6 sm:px-6 lg:flex-row lg:px-8">
@@ -189,6 +252,8 @@ function DashboardContent() {
           onSearchChange={handleSearchChange}
           sort={sort}
           onSortChange={handleSortChange}
+          density={density}
+          onDensityChange={(d) => setDensity(d)}
           onResetFilters={() => {
             setActiveCategory("all");
             setActiveSource(null);
@@ -200,6 +265,23 @@ function DashboardContent() {
           onStatsRefresh={loadStats}
         />
       </main>
+
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectCollection={handleCollectionSelect}
+        onSelectCategory={handleCategorySelect}
+        onSearch={handleSearchChange}
+        onRefresh={handleRefresh}
+        currentDensity={density}
+        onToggleDensity={handleToggleDensity}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+      />
+
+      <ShortcutsHelpModal
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+      />
     </div>
   );
 }
