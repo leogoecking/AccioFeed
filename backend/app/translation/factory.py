@@ -5,6 +5,8 @@ from app.translation.base import (
     TranslationDisabledError,
 )
 from app.translation.deepl import DeepLProvider
+from app.translation.fallback import FallbackTranslationProvider
+from app.translation.google import GoogleTranslateProvider
 from app.translation.libretranslate import LibreTranslateProvider
 from app.translation.mock import MockTranslationProvider
 from app.translation.mymemory import MyMemoryProvider
@@ -26,8 +28,12 @@ def get_translation_provider() -> BaseTranslationProvider:
     if provider_name == "deepl":
         return DeepLProvider()
 
+    if provider_name == "google":
+        return GoogleTranslateProvider()
+
     if provider_name in ("mymemory", "free"):
-        return MyMemoryProvider()
+        # Primary MyMemory with automatic Google fallback on 429 quota or connection errors
+        return FallbackTranslationProvider([MyMemoryProvider(), GoogleTranslateProvider()])
 
     if provider_name in ("libretranslate", "libre"):
         return LibreTranslateProvider()
@@ -37,10 +43,12 @@ def get_translation_provider() -> BaseTranslationProvider:
 
     if provider_name in ("auto", ""):
         if settings.TRANSLATION_API_KEY:
-            return DeepLProvider()
-        return MyMemoryProvider()
+            return FallbackTranslationProvider(
+                [DeepLProvider(), GoogleTranslateProvider(), MyMemoryProvider()]
+            )
+        return FallbackTranslationProvider([GoogleTranslateProvider(), MyMemoryProvider()])
 
     raise TranslationConfigError(
         f"Provedor de tradução '{provider_name}' não é suportado. "
-        "Opções suportadas: 'deepl', 'mymemory', 'libretranslate', 'mock', 'auto'."
+        "Opções suportadas: 'google', 'mymemory', 'deepl', 'libretranslate', 'mock', 'auto'."
     )

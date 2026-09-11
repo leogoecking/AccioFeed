@@ -234,11 +234,24 @@ def test_factory_mymemory():
         patch.object(settings, "TRANSLATION_ENABLED", True),
         patch.object(settings, "TRANSLATION_PROVIDER", "mymemory"),
     ):
+        from app.translation.fallback import FallbackTranslationProvider
         from app.translation.mymemory import MyMemoryProvider
 
         provider = get_translation_provider()
-        assert isinstance(provider, MyMemoryProvider)
-        assert provider.provider_name == "mymemory"
+        assert isinstance(provider, FallbackTranslationProvider)
+        assert isinstance(provider.providers[0], MyMemoryProvider)
+
+
+def test_factory_google():
+    with (
+        patch.object(settings, "TRANSLATION_ENABLED", True),
+        patch.object(settings, "TRANSLATION_PROVIDER", "google"),
+    ):
+        from app.translation.google import GoogleTranslateProvider
+
+        provider = get_translation_provider()
+        assert isinstance(provider, GoogleTranslateProvider)
+        assert provider.provider_name == "google"
 
 
 def test_factory_mock():
@@ -259,10 +272,12 @@ def test_factory_auto_without_key():
         patch.object(settings, "TRANSLATION_PROVIDER", "auto"),
         patch.object(settings, "TRANSLATION_API_KEY", ""),
     ):
-        from app.translation.mymemory import MyMemoryProvider
+        from app.translation.fallback import FallbackTranslationProvider
+        from app.translation.google import GoogleTranslateProvider
 
         provider = get_translation_provider()
-        assert isinstance(provider, MyMemoryProvider)
+        assert isinstance(provider, FallbackTranslationProvider)
+        assert isinstance(provider.providers[0], GoogleTranslateProvider)
 
 
 def test_factory_auto_with_key():
@@ -271,8 +286,11 @@ def test_factory_auto_with_key():
         patch.object(settings, "TRANSLATION_PROVIDER", "auto"),
         patch.object(settings, "TRANSLATION_API_KEY", "some-key:fx"),
     ):
+        from app.translation.fallback import FallbackTranslationProvider
+
         provider = get_translation_provider()
-        assert isinstance(provider, DeepLProvider)
+        assert isinstance(provider, FallbackTranslationProvider)
+        assert isinstance(provider.providers[0], DeepLProvider)
 
 
 @pytest.mark.asyncio
@@ -340,3 +358,56 @@ async def test_mock_provider_translate():
     )
     assert article_res.translated_title == "[PT] Breaking News"
     assert article_res.translated_summary == "[PT] Short summary"
+
+
+@pytest.mark.asyncio
+async def test_google_translate_success():
+    from app.translation.google import GoogleTranslateProvider
+
+    provider = GoogleTranslateProvider()
+    fake_data = [["Notícia importante", "en"]]
+
+    mock_resp = httpx.Response(
+        status_code=200,
+        json=fake_data,
+        request=httpx.Request("GET", provider.api_url),
+    )
+
+    with patch("httpx.AsyncClient.get", return_value=mock_resp):
+        res = await provider.translate("Important news", "pt-BR")
+        assert res.text == "Notícia importante"
+        assert res.detected_source_language == "EN"
+        assert res.provider == "google"
+
+
+@pytest.mark.asyncio
+async def test_fallback_provider_cascades_on_429():
+    from app.translation.base import TranslationQuotaError
+    from app.translation.fallback import FallbackTranslationProvider
+    from app.translation.google import GoogleTranslateProvider
+    from app.translation.mymemory import MyMemoryProvider
+
+    provider1 = MyMemoryProvider()
+    provider2 = GoogleTranslateProvider()
+    fallback = FallbackTranslationProvider([provider1, provider2])
+
+    fake_google_data = [["Título traduzido pelo Google", "en"]]
+    mock_google_resp = httpx.Response(
+        status_code=200,
+        json=fake_google_data,
+        request=httpx.Request("GET", provider2.api_url),
+    )
+
+    # Provider 1 raises 429
+    with patch.object(
+        provider1, "translate_article", side_effect=TranslationQuotaError("Quota exceeded")
+    ):
+        with patch("httpx.AsyncClient.get", return_value=mock_google_resp):
+            res = await fallback.translate_article(
+                title="Apple news",
+                summary="Tech summary",
+                content=None,
+                target_language="pt-BR",
+            )
+            assert res.translated_title == "Título traduzido pelo Google"
+            assert res.provider == "google"

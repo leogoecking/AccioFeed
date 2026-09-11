@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     TRANSLATION_TIMEOUT_SECONDS: int = 10
     TRANSLATION_DEEPL_API_URL: str = ""
     TRANSLATION_LIBRETRANSLATE_API_URL: str = ""
+    TRANSLATION_MYMEMORY_EMAIL: str = "contact@acciofeed.app"
 
     model_config = SettingsConfigDict(
         env_file=".env",

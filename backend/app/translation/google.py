@@ -1,4 +1,4 @@
-import html
+import asyncio
 import logging
 import re
 from typing import Any
@@ -18,7 +18,7 @@ from app.translation.base import (
 logger = logging.getLogger(__name__)
 
 
-def _chunk_text(text: str, max_chunk_size: int = 450) -> list[str]:
+def _chunk_text_google(text: str, max_chunk_size: int = 700) -> list[str]:
     """Split text into manageable chunks respecting paragraphs and sentences."""
     if len(text) <= max_chunk_size:
         return [text]
@@ -66,83 +66,98 @@ def _chunk_text(text: str, max_chunk_size: int = 450) -> list[str]:
     return chunks or [text]
 
 
-class MyMemoryProvider(BaseTranslationProvider):
-    """Free machine translation provider using MyMemory API.
+class GoogleTranslateProvider(BaseTranslationProvider):
+    """Free machine translation provider using Google's dictionary/translation API.
 
-    Requires no API key, works immediately out of the box.
+    Requires no API key, works seamlessly across datacenter networks.
     """
 
-    API_URL = "https://api.mymemory.translated.net/get"
+    API_URL = "https://clients5.google.com/translate_a/t"
 
     def __init__(
         self,
         api_url: str | None = None,
         timeout_seconds: int | None = None,
-        email: str | None = None,
     ):
         self.api_url = api_url or self.API_URL
         self.timeout_seconds = timeout_seconds or settings.TRANSLATION_TIMEOUT_SECONDS
-        self.email = (email or settings.TRANSLATION_MYMEMORY_EMAIL or "").strip()
 
     @property
     def provider_name(self) -> str:
-        return "mymemory"
+        return "google"
 
     def _normalize_target_language(self, lang: str) -> str:
-        cleaned = lang.strip().upper()
-        if cleaned in ("PT", "PT-BR", "PT_BR"):
+        cleaned = lang.strip().lower()
+        if cleaned in ("pt-br", "pt_br", "pt"):
             return "pt-BR"
-        if cleaned in ("PT-PT", "PT_PT"):
+        if cleaned in ("pt-pt", "pt_pt"):
             return "pt-PT"
-        if cleaned in ("EN", "EN-US", "EN_US"):
-            return "en-US"
-        return cleaned.lower()
+        if cleaned.startswith("en"):
+            return "en"
+        return cleaned
 
     async def _fetch_single_segment(
         self,
         client: httpx.AsyncClient,
         text: str,
-        langpair: str,
-    ) -> str:
-        """Query MyMemory for a single text segment with error handling."""
-        params = {"q": text, "langpair": langpair}
-        if self.email:
-            params["de"] = self.email
+        target_lang: str,
+        source_lang: str = "auto",
+    ) -> tuple[str, str | None]:
+        """Fetch translation for a single text chunk."""
+        params = {
+            "client": "dict-chrome-ex",
+            "sl": source_lang,
+            "tl": target_lang,
+            "q": text,
+        }
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "*/*",
+        }
 
         try:
             response = await client.get(
                 self.api_url,
                 params=params,
+                headers=headers,
             )
         except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as net_err:
-            logger.warning("MyMemory connection error: %s", net_err)
+            logger.warning("Google Translate connection error: %s", net_err)
             raise TranslationUnavailableError(
-                "Não foi possível conectar ao serviço de tradução gratuito (MyMemory)."
+                "Não foi possível conectar ao serviço de tradução gratuito (Google)."
             ) from net_err
 
         if response.status_code != 200:
             if response.status_code == 429:
-                raise TranslationQuotaError("Limite de requisições do MyMemory atingido.")
+                raise TranslationQuotaError(
+                    "Limite temporário de requisições atingido. Tente em instantes."
+                )
             raise TranslationUnavailableError(
                 f"Serviço de tradução indisponível (HTTP {response.status_code})."
             )
 
         try:
-            data: dict[str, Any] = response.json()
+            data: Any = response.json()
         except Exception as json_err:
             raise TranslationUnavailableError(
                 "Resposta inválida do serviço de tradução."
             ) from json_err
 
-        if data.get("responseStatus") == 429 or data.get("quotaFinished") is True:
-            raise TranslationQuotaError("Cota diária de tradução gratuita do MyMemory atingida.")
+        detected_lang: str | None = None
+        if isinstance(data, list) and data:
+            first = data[0]
+            if isinstance(first, str):
+                return first, None
+            if isinstance(first, list) and first:
+                trans_text = str(first[0])
+                if len(first) > 1 and isinstance(first[1], str):
+                    detected_lang = first[1]
+                return trans_text, detected_lang
 
-        res_data = data.get("responseData") or {}
-        translated = res_data.get("translatedText")
-        if translated:
-            return html.unescape(translated)
-
-        return text
+        return text, None
 
     async def translate(
         self,
@@ -150,7 +165,6 @@ class MyMemoryProvider(BaseTranslationProvider):
         target_language: str,
         source_language: str | None = None,
     ) -> TranslationResult:
-        """Translate a text string."""
         if not text or not text.strip():
             return TranslationResult(
                 text=text,
@@ -161,7 +175,7 @@ class MyMemoryProvider(BaseTranslationProvider):
 
         target_lang = self._normalize_target_language(target_language)
 
-        if target_lang == "pt-BR" and self.is_text_already_portuguese(text):
+        if target_lang in ("pt", "pt-BR") and self.is_text_already_portuguese(text):
             return TranslationResult(
                 text=text,
                 detected_source_language="PT",
@@ -169,22 +183,25 @@ class MyMemoryProvider(BaseTranslationProvider):
                 provider=self.provider_name,
             )
 
-        src = (source_language or "en").lower()
-        langpair = f"{src}|{target_lang}"
-
-        chunks = _chunk_text(text)
+        src = (source_language or "auto").lower()
+        chunks = _chunk_text_google(text)
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             translated_chunks: list[str] = []
-            for chunk in chunks:
-                part = await self._fetch_single_segment(client, chunk, langpair)
+            detected_lang: str | None = None
+            for idx, chunk in enumerate(chunks):
+                if idx > 0:
+                    await asyncio.sleep(0.1)
+                part, d_lang = await self._fetch_single_segment(client, chunk, target_lang, src)
                 translated_chunks.append(part)
+                if d_lang:
+                    detected_lang = d_lang
 
         combined = " ".join(translated_chunks) if len(chunks) > 1 else translated_chunks[0]
 
         return TranslationResult(
             text=combined,
-            detected_source_language=src.upper(),
+            detected_source_language=(detected_lang or src).upper(),
             target_language=target_lang,
             provider=self.provider_name,
         )
@@ -197,7 +214,6 @@ class MyMemoryProvider(BaseTranslationProvider):
         target_language: str,
         source_language: str | None = None,
     ) -> ArticleTranslationResult:
-        """Translate article title, summary and content."""
         target_lang = self._normalize_target_language(target_language)
         cleaned_title = title.strip() if title else ""
 
@@ -211,7 +227,7 @@ class MyMemoryProvider(BaseTranslationProvider):
                 provider=self.provider_name,
             )
 
-        if target_lang == "pt-BR" and self.is_text_already_portuguese(cleaned_title):
+        if target_lang in ("pt", "pt-BR") and self.is_text_already_portuguese(cleaned_title):
             return ArticleTranslationResult(
                 translated_title=cleaned_title,
                 translated_summary=summary,
@@ -221,38 +237,42 @@ class MyMemoryProvider(BaseTranslationProvider):
                 provider=self.provider_name,
             )
 
-        src = (source_language or "en").lower()
-        langpair = f"{src}|{target_lang}"
+        src = (source_language or "auto").lower()
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             # 1. Translate Title
-            translated_title = await self._fetch_single_segment(client, cleaned_title, langpair)
+            translated_title, detected = await self._fetch_single_segment(
+                client, cleaned_title, target_lang, src
+            )
 
             # 2. Translate Summary (if present)
             translated_summary: str | None = None
             if summary and summary.strip():
                 clean_summary = summary.strip()
-                chunks = _chunk_text(clean_summary)
-                parts = [await self._fetch_single_segment(client, c, langpair) for c in chunks]
+                chunks = _chunk_text_google(clean_summary)
+                parts: list[str] = []
+                for c in chunks:
+                    part, _ = await self._fetch_single_segment(client, c, target_lang, src)
+                    parts.append(part)
                 translated_summary = " ".join(parts) if len(parts) > 1 else parts[0]
 
-            # 3. Translate Content (if present and needed)
+            # 3. Translate Content (if present)
             translated_content: str | None = None
             if content and content.strip():
                 clean_content = sanitize_text(content, max_length=4000)
                 if clean_content:
-                    chunks = _chunk_text(clean_content)
-                    # Limit to first 4 chunks for latency & quota safety
-                    parts = [
-                        await self._fetch_single_segment(client, c, langpair) for c in chunks[:4]
-                    ]
+                    chunks = _chunk_text_google(clean_content)
+                    parts = []
+                    for c in chunks[:4]:
+                        part, _ = await self._fetch_single_segment(client, c, target_lang, src)
+                        parts.append(part)
                     translated_content = "\n\n".join(parts) if len(parts) > 1 else parts[0]
 
         return ArticleTranslationResult(
             translated_title=translated_title,
             translated_summary=translated_summary,
             translated_content=translated_content,
-            detected_source_language=src.upper(),
+            detected_source_language=(detected or src).upper(),
             target_language=target_lang,
             provider=self.provider_name,
         )

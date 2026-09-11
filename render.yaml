@@ -34,7 +34,9 @@ services:
       - key: TRANSLATION_ENABLED
         value: "true"
       - key: TRANSLATION_PROVIDER
-        value: mymemory
+        value: auto
+      - key: TRANSLATION_MYMEMORY_EMAIL
+        value: contact@acciofeed.app
       - key: TRANSLATION_API_KEY
         sync: false
       - key: ENABLE_EMBEDDED_WORKER
