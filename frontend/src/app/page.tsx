@@ -18,14 +18,12 @@ function DashboardContent() {
   const initialState = searchParams.get("state") || "all";
   const initialSearch = searchParams.get("search") || "";
   const initialSort = (searchParams.get("sort") as "recent" | "popular" | "history" | "last_opened") || "recent";
-  const initialPage = parseInt(searchParams.get("page") || "1", 10);
 
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [activeCategory, setActiveCategory] = useState(initialCategory);
   const [activeSource, setActiveSource] = useState<string | null>(initialSource);
   const [activeCollection, setActiveCollection] = useState<string>(initialState);
   const [sort, setSort] = useState<"recent" | "popular" | "history" | "last_opened">(initialSort);
-  const [page, setPage] = useState(initialPage);
   const [sources, setSources] = useState<SourcePublic[]>([]);
   const [stats, setStats] = useState<LibraryStats>({ unread: 0, saved: 0, favorites: 0, total: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -64,8 +62,7 @@ function DashboardContent() {
     newSrc: string | null,
     newCol: string,
     newSearch: string,
-    newSort: "recent" | "popular" | "history" | "last_opened",
-    newPage: number
+    newSort: "recent" | "popular" | "history" | "last_opened"
   ) => {
     const params = new URLSearchParams();
     if (newCat && newCat !== "all") params.set("category", newCat);
@@ -73,7 +70,6 @@ function DashboardContent() {
     if (newCol && newCol !== "all") params.set("state", newCol);
     if (newSearch.trim()) params.set("search", newSearch.trim());
     if (newSort !== "recent" && newCol !== "history") params.set("sort", newSort);
-    if (newPage > 1) params.set("page", newPage.toString());
 
     const queryString = params.toString();
     const target = queryString ? `?${queryString}` : "/";
@@ -128,40 +124,30 @@ function DashboardContent() {
 
   const handleCollectionSelect = (col: string) => {
     setActiveCollection(col);
-    setPage(1);
     const targetSort = col === "history" ? "history" : "recent";
     setSort(targetSort);
-    updateUrlParams(activeCategory, activeSource, col, searchQuery, targetSort, 1);
+    updateUrlParams(activeCategory, activeSource, col, searchQuery, targetSort);
   };
 
   const handleCategorySelect = (cat: string) => {
     setActiveCategory(cat);
     setActiveSource(null);
-    setPage(1);
-    updateUrlParams(cat, null, activeCollection, searchQuery, sort, 1);
+    updateUrlParams(cat, null, activeCollection, searchQuery, sort);
   };
 
   const handleSourceSelect = (src: string | null) => {
     setActiveSource(src);
-    setPage(1);
-    updateUrlParams(activeCategory, src, activeCollection, searchQuery, sort, 1);
+    updateUrlParams(activeCategory, src, activeCollection, searchQuery, sort);
   };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    setPage(1);
-    updateUrlParams(activeCategory, activeSource, activeCollection, query, sort, 1);
+    updateUrlParams(activeCategory, activeSource, activeCollection, query, sort);
   };
 
   const handleSortChange = (newSort: "recent" | "popular" | "history" | "last_opened") => {
     setSort(newSort);
-    setPage(1);
-    updateUrlParams(activeCategory, activeSource, activeCollection, searchQuery, newSort, 1);
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-    updateUrlParams(activeCategory, activeSource, activeCollection, searchQuery, sort, newPage);
+    updateUrlParams(activeCategory, activeSource, activeCollection, searchQuery, newSort);
   };
 
   return (
@@ -195,13 +181,22 @@ function DashboardContent() {
         <Timeline
           key={timelineRefreshKey}
           activeCategory={activeCategory}
+          onCategoryChange={handleCategorySelect}
           activeCollection={activeCollection}
           activeSource={activeSource}
+          onSourceChange={handleSourceSelect}
           searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
           sort={sort}
           onSortChange={handleSortChange}
-          page={page}
-          onPageChange={handlePageChange}
+          onResetFilters={() => {
+            setActiveCategory("all");
+            setActiveSource(null);
+            setActiveCollection("all");
+            setSearchQuery("");
+            setSort("recent");
+            updateUrlParams("all", null, "all", "", "recent");
+          }}
           onStatsRefresh={loadStats}
         />
       </main>
@@ -211,7 +206,7 @@ function DashboardContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
       <DashboardContent />
     </Suspense>
   );
