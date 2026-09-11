@@ -1,4 +1,4 @@
-# Render Blueprint Specification for Tech News Hub
+# Render Blueprint Specification for AccioFeed
 # https://render.com/docs/blueprint-spec
 
 databases:
@@ -11,7 +11,7 @@ databases:
 services:
   # 1. FastAPI REST API Backend
   - type: web
-    name: technewshub-api
+    name: acciofeed-api
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -48,7 +48,7 @@ services:
 
   # 2. Next.js Frontend
   - type: web
-    name: technewshub-web
+    name: acciofeed-web
     runtime: docker
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
@@ -58,6 +58,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: INTERNAL_API_URL
-        value: "https://technewshub-api.onrender.com"
+        value: "https://acciofeed-api.onrender.com"
       - key: NEXT_PUBLIC_API_URL
-        value: "https://technewshub-api.onrender.com"
+        value: "https://acciofeed-api.onrender.com"

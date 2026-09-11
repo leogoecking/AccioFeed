@@ -46,10 +46,14 @@ function getCandidateUrls(customHeaderUrl?: string | null): string[] {
     }
   }
 
-  // 4. Default public Render domain
-  const defaultRender = "https://technewshub-api.onrender.com";
+  // 4. Default public Render domains (new and legacy)
+  const defaultRender = "https://acciofeed-api.onrender.com";
   if (!list.includes(defaultRender)) {
     list.push(defaultRender);
+  }
+  const legacyRender = "https://technewshub-api.onrender.com";
+  if (!list.includes(legacyRender)) {
+    list.push(legacyRender);
   }
 
   // 5. Localhost fallback

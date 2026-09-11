@@ -10,12 +10,12 @@ O projeto utiliza o arquivo [`render.yaml`](../render.yaml) na raiz do repositó
 
 1. **`technewshub-db`** (PostgreSQL Gerenciado - Plano Free):
    - Banco de dados relacional para notícias, histórico, favoritos e traduções.
-2. **`technewshub-api`** (Web Service Docker - Plano Free):
+2. **`acciofeed-api`** (Web Service Docker - Plano Free):
    - Executa a API REST FastAPI.
    - Aplica migrações do banco de dados automaticamente na inicialização via Alembic.
    - Executa o **Worker de ingestão embutido** (`ENABLE_EMBEDDED_WORKER=true`), dispensando a necessidade de contratar um background worker pago.
    - Provedor de tradução padrão: `mymemory` (gratuito e sem necessidade de chave de API).
-3. **`technewshub-web`** (Web Service Docker - Plano Free):
+3. **`acciofeed-web`** (Web Service Docker - Plano Free):
    - Executa o frontend Next.js otimizado (standalone).
    - Comunica-se com o backend da API.
 
@@ -31,14 +31,14 @@ O projeto utiliza o arquivo [`render.yaml`](../render.yaml) na raiz do repositó
 1. No painel do Render, clique no botão superior direito **New +** e selecione **Blueprint**.
 2. Conecte o repositório GitHub: **`leogoecking/TechNewsHub`**.
 3. O Render identificará automaticamente o arquivo `render.yaml`.
-4. Dê um nome para a instância do Blueprint (ex: `tech-news-hub`).
+4. Dê um nome para a instância do Blueprint (ex: `acciofeed`).
 5. Clique em **Apply**.
 
 ### Passo 3: Aguardar o Build
 O Render criará os 3 serviços em sequência:
 1. `technewshub-db`: cria o banco de dados PostgreSQL.
-2. `technewshub-api`: compila o container Docker do backend, conecta ao banco e roda as migrações.
-3. `technewshub-web`: compila o frontend Next.js apontando para o backend.
+2. `acciofeed-api`: compila o container Docker do backend, conecta ao banco e roda as migrações.
+3. `acciofeed-web`: compila o frontend Next.js apontando para o backend.
 
 ---
 

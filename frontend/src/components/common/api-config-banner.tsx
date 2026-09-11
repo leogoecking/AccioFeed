@@ -21,7 +21,7 @@ export function ApiConfigBanner({ onConnected }: ApiConfigBannerProps) {
     if (saved) {
       setApiUrl(saved);
     } else {
-      setApiUrl("https://technewshub-api.onrender.com");
+      setApiUrl("https://acciofeed-api.onrender.com");
     }
   }, []);
 
