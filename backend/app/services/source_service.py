@@ -113,22 +113,24 @@ class SourceService:
 
         async with lock:
             collector = CollectorService(self.db)
-            res = await collector.sync_source(source)
-            if res.success:
+            res = await collector.collect_from_source(source, force=True)
+            if res.get("status") == "success":
+                new_count = res.get("new", 0)
                 msg = (
-                    f"{res.articles_new} novas notícias coletadas de {source.name}."
-                    if res.articles_new > 0
+                    f"{new_count} novas notícias coletadas de {source.name}."
+                    if new_count > 0
                     else f"Nenhuma notícia nova encontrada em {source.name}."
                 )
                 return {
                     "status": "success",
                     "message": msg,
-                    "new_articles": res.articles_new,
+                    "new_articles": new_count,
                     "sources_processed": 1,
                 }
+            error_msg = res.get("error") or source.last_error_message or "Falha desconhecida"
             return {
                 "status": "error",
-                "message": f"Erro ao sincronizar {source.name}: {source.last_error_message or 'Falha desconhecida'}",
+                "message": f"Erro ao sincronizar {source.name}: {error_msg}",
                 "new_articles": 0,
                 "sources_processed": 1,
             }
@@ -144,17 +146,24 @@ class SourceService:
             }
 
         async with lock:
+            sources = await self.repo.list_all(active_only=True)
             collector = CollectorService(self.db)
-            report = await collector.sync_all_sources(force=force)
-            total_new = sum(r.articles_new for r in report.results)
+            total_new = 0
+            sources_success = 0
+            for src in sources:
+                res = await collector.collect_from_source(src, force=force)
+                if res.get("status") == "success":
+                    total_new += res.get("new", 0)
+                    sources_success += 1
+
             msg = (
-                f"Sincronização concluída: {total_new} novas notícias de {report.sources_success} fontes."
+                f"Sincronização concluída: {total_new} novas notícias de {sources_success} fontes."
                 if total_new > 0
-                else f"Sincronização concluída: nenhuma notícia nova ({report.sources_success} fontes atualizadas)."
+                else f"Sincronização concluída: nenhuma notícia nova ({sources_success} fontes atualizadas)."
             )
             return {
                 "status": "success",
                 "message": msg,
                 "new_articles": total_new,
-                "sources_processed": len(report.results),
+                "sources_processed": len(sources),
             }

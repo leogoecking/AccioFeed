@@ -135,3 +135,14 @@ class CollectorService:
                 "duplicates": 0,
                 "duration_ms": duration_ms,
             }
+
+    async def sync_source(self, source: Source, force: bool = True) -> dict[str, Any]:
+        return await self.collect_from_source(source, force=force)
+
+    async def sync_all_sources(self, force: bool = True) -> list[dict[str, Any]]:
+        sources = await self.source_repo.list_all(active_only=True)
+        results = []
+        for src in sources:
+            res = await self.collect_from_source(src, force=force)
+            results.append(res)
+        return results

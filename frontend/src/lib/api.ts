@@ -211,10 +211,14 @@ export async function validateFeed(feedUrl: string): Promise<FeedValidateRespons
     body: JSON.stringify({ feed_url: feedUrl }),
   });
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Falha ao validar feed.");
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || `Falha ao validar feed (${res.status})`);
   }
-  return await res.json();
+  const data = await res.json().catch(() => null);
+  if (!data) {
+    throw new Error("Resposta inválida recebida do servidor ao validar feed.");
+  }
+  return data;
 }
 
 export async function createCustomSource(data: {
@@ -231,10 +235,14 @@ export async function createCustomSource(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Falha ao cadastrar nova fonte.");
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || `Falha ao cadastrar nova fonte (${res.status})`);
   }
-  return await res.json();
+  const result = await res.json().catch(() => null);
+  if (!result) {
+    throw new Error("Resposta inválida recebida do servidor ao cadastrar fonte.");
+  }
+  return result;
 }
 
 export async function updateSource(
@@ -253,22 +261,88 @@ export async function updateSource(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Falha ao atualizar fonte.");
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || `Falha ao atualizar fonte (${res.status})`);
   }
-  return await res.json();
+  const result = await res.json().catch(() => null);
+  if (!result) {
+    throw new Error("Resposta inválida recebida do servidor ao atualizar fonte.");
+  }
+  return result;
 }
 
 export async function syncSingleSource(id: number): Promise<SyncResponse> {
   const url = `${API_BASE}/api/v1/sources/${id}/sync`;
-  const res = await apiFetch(url, { method: "POST" });
-  return await res.json();
+  try {
+    const res = await apiFetch(url, { method: "POST" });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => null);
+      const detail =
+        errorData?.detail ||
+        `Erro ao sincronizar fonte (Status HTTP ${res.status}${res.statusText ? `: ${res.statusText}` : ""})`;
+      return {
+        status: "error",
+        message: detail,
+        new_articles: 0,
+        sources_processed: 0,
+      };
+    }
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      return {
+        status: "error",
+        message: "Resposta do servidor em formato inválido.",
+        new_articles: 0,
+        sources_processed: 0,
+      };
+    }
+    return data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Falha na requisição de sincronização.";
+    return {
+      status: "error",
+      message: msg,
+      new_articles: 0,
+      sources_processed: 0,
+    };
+  }
 }
 
 export async function syncAllSources(force: boolean = true): Promise<SyncResponse> {
   const url = `${API_BASE}/api/v1/sources/sync?force=${force}`;
-  const res = await apiFetch(url, { method: "POST" });
-  return await res.json();
+  try {
+    const res = await apiFetch(url, { method: "POST" });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => null);
+      const detail =
+        errorData?.detail ||
+        `Erro ao sincronizar fontes (Status HTTP ${res.status}${res.statusText ? `: ${res.statusText}` : ""})`;
+      return {
+        status: "error",
+        message: detail,
+        new_articles: 0,
+        sources_processed: 0,
+      };
+    }
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      return {
+        status: "error",
+        message: "Resposta do servidor em formato inválido.",
+        new_articles: 0,
+        sources_processed: 0,
+      };
+    }
+    return data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Falha na requisição de sincronização.";
+    return {
+      status: "error",
+      message: msg,
+      new_articles: 0,
+      sources_processed: 0,
+    };
+  }
 }
 
 export async function fetchCategories(): Promise<string[]> {

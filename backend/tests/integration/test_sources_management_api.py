@@ -155,3 +155,45 @@ async def test_seed_preserves_user_deactivation(db_session: AsyncSession):
     assert refreshed_hn is not None
     assert refreshed_hn.is_active is False
     assert refreshed_hn.poll_interval_minutes == 45
+
+
+@pytest.mark.asyncio
+async def test_sync_source_and_sync_all_endpoints(
+    async_client: AsyncClient, db_session: AsyncSession
+):
+    repo = SourceRepository(db_session)
+    source = await repo.create(
+        Source(
+            name="Test Feed",
+            slug="test-feed",
+            type="rss",
+            base_url="https://testfeed.com",
+            feed_url="https://testfeed.com/rss.xml",
+            default_category="technology",
+            is_active=True,
+            poll_interval_minutes=15,
+        )
+    )
+
+    with patch.object(
+        SourceRepository, "record_poll_result", new_callable=AsyncMock
+    ), patch(
+        "app.services.collector_service.resolve_provider_for_source"
+    ) as mock_resolve:
+        mock_provider = AsyncMock()
+        mock_provider.fetch.return_value = []
+        mock_resolve.return_value = mock_provider
+
+        # 1. Test POST /api/v1/sources/{id}/sync
+        res = await async_client.post(f"/api/v1/sources/{source.id}/sync")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "success"
+        assert data["sources_processed"] == 1
+
+        # 2. Test POST /api/v1/sources/sync
+        res_all = await async_client.post("/api/v1/sources/sync?force=true")
+        assert res_all.status_code == 200
+        all_data = res_all.json()
+        assert all_data["status"] == "success"
+        assert all_data["sources_processed"] >= 1
