@@ -165,6 +165,38 @@ function DashboardContent() {
     return () => clearTimeout(timer);
   }, [searchInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Dynamic document title based on search query, category or collection
+  useEffect(() => {
+    if (debouncedSearchQuery.trim()) {
+      document.title = `${debouncedSearchQuery.trim()} — Busca — AccioFeed`;
+    } else if (activeCategory && activeCategory !== "all") {
+      const catLabels: Record<string, string> = {
+        technology: "Tecnologia",
+        dev: "Desenvolvimento",
+        ai: "Inteligência Artificial",
+        hardware: "Hardware",
+        science: "Ciência",
+        linux: "Linux",
+        general: "Geral",
+      };
+      const label =
+        catLabels[activeCategory] ||
+        activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1);
+      document.title = `${label} — AccioFeed`;
+    } else if (activeCollection && activeCollection !== "all") {
+      const colLabels: Record<string, string> = {
+        unread: "Não Lidos",
+        saved: "Ler Depois",
+        favorites: "Favoritos",
+        history: "Histórico",
+      };
+      const label = colLabels[activeCollection] || "Coleção";
+      document.title = `${label} — AccioFeed`;
+    } else {
+      document.title = "AccioFeed — Leitor Pessoal de Tecnologia";
+    }
+  }, [debouncedSearchQuery, activeCategory, activeCollection]);
+
   const handleCollectionSelect = (col: string) => {
     setActiveCollection(col);
     const targetSort = col === "history" ? "history" : "recent";

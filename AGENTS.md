@@ -1,6 +1,6 @@
 # Diretrizes para Agentes de Código (AGENTS.md)
 
-Este documento estabelece os padrões e regras fundamentais que qualquer agente autônomo ou desenvolvedor assistido por IA deve seguir ao trabalhar no repositório **Tech News Hub**.
+Este documento estabelece os padrões e regras fundamentais que qualquer agente autônomo ou desenvolvedor assistido por IA deve seguir ao trabalhar no repositório **AccioFeed** (anteriormente Tech News Hub).
 
 ## 1. Princípios e Regras Gerais
 

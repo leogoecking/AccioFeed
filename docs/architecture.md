@@ -1,12 +1,12 @@
-# Arquitetura do Tech News Hub
+# Arquitetura do AccioFeed
 
-Este documento descreve as decisões arquiteturais fundamentais, os fluxos de dados, os padrões adotados e as diretrizes de design do **Tech News Hub**.
+Este documento descreve as decisões arquiteturais fundamentais, os fluxos de dados, os padrões adotados e as diretrizes de design do **AccioFeed** (anteriormente Tech News Hub).
 
 ---
 
 ## 1. Visão Geral e Objetivos
 
-O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e discussões sobre tecnologia. O sistema é desenhado para:
+O **AccioFeed** é um agregador inteligente e self-hosted de notícias e discussões sobre tecnologia. O sistema é desenhado para:
 1. Coletar periodicamente artigos de fontes heterogêneas (APIs públicas oficiais como Hacker News e feeds RSS/Atom) de forma resiliente e não-bloqueante.
 2. Normalizar conteúdos heterogêneos em um modelo de dados canônico.
 3. Evitar duplicatas garantindo atualização contínua de métricas de popularidade (pontuação, contagem de comentários).

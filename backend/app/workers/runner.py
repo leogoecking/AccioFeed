@@ -5,7 +5,7 @@ from app.workers.scheduler import IngestionScheduler
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Tech News Hub Ingestion Worker")
+    parser = argparse.ArgumentParser(description="AccioFeed Ingestion Worker")
     parser.add_argument(
         "--run-once",
         action="store_true",

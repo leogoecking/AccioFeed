@@ -67,6 +67,7 @@ export default function SourcesPage() {
   };
 
   useEffect(() => {
+    document.title = "Fontes — AccioFeed";
     loadSources();
   }, []);
 

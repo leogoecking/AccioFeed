@@ -29,7 +29,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PROJECT_NAME: ${PROJECT_NAME:-Tech News Hub}
+      PROJECT_NAME: ${PROJECT_NAME:-AccioFeed}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DEBUG: ${DEBUG:-true}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-technewshub}
@@ -68,7 +68,7 @@ services:
       backend:
         condition: service_healthy
     environment:
-      PROJECT_NAME: ${PROJECT_NAME:-Tech News Hub}
+      PROJECT_NAME: ${PROJECT_NAME:-AccioFeed}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-technewshub}
       WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-300}

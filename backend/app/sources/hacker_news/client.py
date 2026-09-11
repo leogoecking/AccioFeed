@@ -44,7 +44,7 @@ class HackerNewsClient:
             story_types = ["top", "best"]
 
         async with httpx.AsyncClient(
-            headers={"User-Agent": "TechNewsHub/1.0"},
+            headers={"User-Agent": "AccioFeed/1.0"},
             timeout=self.timeout,
         ) as client:
             all_ids: list[int] = []

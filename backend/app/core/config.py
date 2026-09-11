@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Tech News Hub"
+    PROJECT_NAME: str = "AccioFeed"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 

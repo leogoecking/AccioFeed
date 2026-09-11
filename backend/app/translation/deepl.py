@@ -79,7 +79,7 @@ class DeepLProvider(BaseTranslationProvider):
         headers = {
             "Authorization": f"DeepL-Auth-Key {self.api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "TechNewsHub-Translator/1.0",
+            "User-Agent": "AccioFeed-Translator/1.0",
         }
 
         last_error: Exception | None = None

@@ -2,7 +2,7 @@ import httpx
 
 from app.core.config import settings
 
-DEFAULT_USER_AGENT = "TechNewsHub/1.0 (+https://github.com/usuario/tech-news-hub; RSS Reader)"
+DEFAULT_USER_AGENT = "AccioFeed/1.0 (+https://github.com/leogoecking/TechNewsHub; RSS Reader)"
 
 
 def create_http_client(

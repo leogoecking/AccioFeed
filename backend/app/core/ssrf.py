@@ -114,7 +114,7 @@ async def safe_fetch_feed(
     max_redirects: int = MAX_REDIRECTS,
     max_bytes: int = MAX_FEED_BYTES,
     timeout: float = DEFAULT_FEED_TIMEOUT,
-    user_agent: str = "TechNewsHub/1.0 (+https://github.com/usuario/tech-news-hub; RSS Reader)",
+    user_agent: str = "AccioFeed/1.0 (+https://github.com/leogoecking/TechNewsHub; RSS Reader)",
 ) -> bytes:
     """
     Safely fetches a remote feed with strict SSRF re-validation on every redirect,

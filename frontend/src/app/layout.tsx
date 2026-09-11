@@ -13,9 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AccioFeed_ — Leitor Pessoal de Tecnologia",
+  title: {
+    default: "AccioFeed — Leitor Pessoal de Tecnologia",
+    template: "%s — AccioFeed",
+  },
   description:
     "Agregador e leitor pessoal de tecnologia focado em velocidade, legibilidade editorial e baixo ruído.",
+  openGraph: {
+    title: "AccioFeed — Leitor Pessoal de Tecnologia",
+    description:
+      "Agregador e leitor pessoal de tecnologia focado em velocidade, legibilidade editorial e baixo ruído.",
+    siteName: "AccioFeed",
+    locale: "pt_BR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

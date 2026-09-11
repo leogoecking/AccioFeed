@@ -1,7 +1,7 @@
 [project]
-name = "tech-news-hub-backend"
+name = "acciofeed-backend"
 version = "0.1.0"
-description = "Backend for Tech News Hub aggregator"
+description = "Backend for AccioFeed aggregator"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

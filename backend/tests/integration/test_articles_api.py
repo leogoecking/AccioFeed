@@ -41,7 +41,7 @@ async def test_get_articles_and_detail(async_client: AsyncClient, db_session: As
     service = ArticleService(db_session)
     item = NormalizedArticle(
         external_id="story-42",
-        title="Show HN: A self-hosted tech news hub",
+        title="Show HN: A self-hosted AccioFeed hub",
         url="https://github.com/example/tech-news-hub",
         author="agent",
         summary="A clean aggregator for tech news with zero telemetry.",
@@ -92,7 +92,7 @@ async def test_get_articles_and_detail(async_client: AsyncClient, db_session: As
     resp_search_summary = await async_client.get("/api/v1/articles?search=telemetry")
     assert resp_search_summary.status_code == 200
     assert resp_search_summary.json()["total"] == 1
-    assert resp_search_summary.json()["items"][0]["title"] == "Show HN: A self-hosted tech news hub"
+    assert resp_search_summary.json()["items"][0]["title"] == "Show HN: A self-hosted AccioFeed hub"
 
     # 6. Test sorting by popular
     resp_popular = await async_client.get("/api/v1/articles?sort=popular")

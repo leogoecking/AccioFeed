@@ -21,7 +21,7 @@ def run_seed():
 def run_sync(force: bool = True):
     async def _sync():
         print("========================================")
-        print("         Tech News Hub Sync             ")
+        print("            AccioFeed Sync              ")
         print("========================================\n")
 
         scheduler = IngestionScheduler()
@@ -68,7 +68,7 @@ def run_sync(force: bool = True):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Tech News Hub CLI Utility")
+    parser = argparse.ArgumentParser(description="AccioFeed CLI Utility")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # sync command
