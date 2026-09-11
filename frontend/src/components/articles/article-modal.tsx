@@ -2,39 +2,52 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Bookmark,
-  Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   EyeOff,
   ExternalLink,
-  Languages,
-  Loader2,
-  MessageSquare,
+  Newspaper,
   Star,
-  Tag,
-  ThumbsUp,
-  User,
   X,
 } from "lucide-react";
-import { ArticlePublic, ArticleStatePublic, ArticleTranslationPublic } from "@/lib/types";
-import { getCategoryBadge, getSourceBadge } from "@/lib/utils";
+import { ArticlePublic, ArticleStatePublic } from "@/lib/types";
 import {
-  fetchArticleTranslation,
-  recordArticleOpened,
-  translateArticle,
-  updateArticleState,
-} from "@/lib/api";
+  cn,
+  estimateReadingTime,
+  formatFullDate,
+  formatRelativeTime,
+  getCategoryBadge,
+  getSourceBadge,
+} from "@/lib/utils";
+import { recordArticleOpened, updateArticleState } from "@/lib/api";
 
 interface ArticleModalProps {
   article: ArticlePublic | null;
   onClose: () => void;
+  onNavigatePrevious?: () => void;
+  onNavigateNext?: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
   onStateChange?: (articleId: string, newState: Partial<ArticleStatePublic>) => void;
   onHide?: (articleId: string) => void;
 }
 
-export function ArticleModal({ article, onClose, onStateChange, onHide }: ArticleModalProps) {
+export function ArticleModal({
+  article,
+  onClose,
+  onNavigatePrevious,
+  onNavigateNext,
+  hasPrevious = false,
+  hasNext = false,
+  onStateChange,
+  onHide,
+}: ArticleModalProps) {
   const [imageError, setImageError] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
   const [localState, setLocalState] = useState<ArticleStatePublic>({
     is_read: false,
     is_favorite: false,
@@ -42,13 +55,10 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     is_hidden: false,
   });
 
-  // Translation states
-  const [languageMode, setLanguageMode] = useState<"original" | "pt-br">("original");
-  const [translation, setTranslation] = useState<ArticleTranslationPublic | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [translationError, setTranslationError] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const originalScrollY = useRef(0);
 
-  // Keep stable refs to callback props to avoid triggering effects when parents re-render
+  // Keep stable refs to callbacks
   const onStateChangeRef = useRef(onStateChange);
   useEffect(() => {
     onStateChangeRef.current = onStateChange;
@@ -59,21 +69,25 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     onCloseRef.current = onClose;
   });
 
+  const onNavigatePreviousRef = useRef(onNavigatePrevious);
+  useEffect(() => {
+    onNavigatePreviousRef.current = onNavigatePrevious;
+  });
+
+  const onNavigateNextRef = useRef(onNavigateNext);
+  useEffect(() => {
+    onNavigateNextRef.current = onNavigateNext;
+  });
+
   const articleId = article?.id;
 
-  // Effect to handle article selection / change: only runs when articleId changes!
+  // Track article opening & reading progress reset
   useEffect(() => {
-    if (!articleId) {
-      setTranslation(null);
-      setLanguageMode("original");
-      return;
-    }
+    if (!articleId) return;
 
     let isMounted = true;
     setImageError(false);
-    setTranslationError(null);
-    setLanguageMode("original");
-    setTranslation(null);
+    setReadingProgress(0);
 
     // Automatically record opening in background (marks read, records timestamps)
     recordArticleOpened(articleId).then((updated) => {
@@ -83,12 +97,10 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
       }
     });
 
-    // Check if translation already exists in cache
-    fetchArticleTranslation(articleId, "pt-BR").then((cached) => {
-      if (isMounted && cached) {
-        setTranslation(cached);
-      }
-    });
+    // Reset scroll of the reader to the top
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
 
     return () => {
       isMounted = false;
@@ -102,36 +114,66 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     }
   }, [article?.state]);
 
-  // Lock body scroll and handle Escape key while modal is open
+  // Scroll preservation and keyboard navigation
   useEffect(() => {
     if (!article) return;
+
+    // Save exact timeline scroll position
+    originalScrollY.current = window.scrollY;
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current?.();
+      // Don't trigger if user is typing in an input
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        onCloseRef.current?.();
+      } else if (e.key === "ArrowLeft" && hasPrevious) {
+        onNavigatePreviousRef.current?.();
+      } else if (e.key === "ArrowRight" && hasNext) {
+        onNavigateNextRef.current?.();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = originalOverflow || "";
       window.removeEventListener("keydown", handleKeyDown);
+      // Guarantee scroll position preservation
+      window.scrollTo(0, originalScrollY.current);
     };
-  }, [article]);
+  }, [article, hasPrevious, hasNext]);
+
+  // Scroll listener for reading progress bar
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const totalScrollable = scrollHeight - clientHeight;
+    if (totalScrollable <= 0) {
+      setReadingProgress(100);
+    } else {
+      const progress = Math.min(100, Math.max(0, (scrollTop / totalScrollable) * 100));
+      setReadingProgress(progress);
+    }
+  };
 
   if (!article) return null;
 
   const categoryMeta = getCategoryBadge(article.category);
   const sourceMeta = getSourceBadge(article.source.slug);
-  const formattedDate = new Date(article.published_at).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
+  const timeFormatted = formatRelativeTime(article.published_at);
+  const fullDateFormatted = formatFullDate(article.published_at);
+  const contentBody = article.content || article.summary;
+  const readingTime = estimateReadingTime(contentBody);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
   const toggleFavorite = async () => {
@@ -161,308 +203,243 @@ export function ArticleModal({ article, onClose, onStateChange, onHide }: Articl
     await updateArticleState(article.id, { is_hidden: true });
   };
 
-  const handleTranslate = async () => {
-    if (translation) {
-      setLanguageMode("pt-br");
-      return;
-    }
-    const currentId = article.id;
-    setIsTranslating(true);
-    setTranslationError(null);
-    try {
-      const res = await translateArticle(currentId, "pt-BR");
-      if (article.id === currentId) {
-        setTranslation(res);
-        setLanguageMode("pt-br");
-      }
-    } catch (err: unknown) {
-      if (article.id === currentId) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original.";
-        setTranslationError(msg);
-      }
-    } finally {
-      if (article.id === currentId) {
-        setIsTranslating(false);
-      }
-    }
-  };
-
-  const isPtActive = languageMode === "pt-br" && Boolean(translation);
-  const displayTitle = isPtActive ? translation!.translated_title : article.title;
-  const originalBody = article.summary || article.content;
-  const translatedBody = isPtActive
-    ? translation?.translated_summary || translation?.translated_content
-    : null;
-  const displayBody = isPtActive && translatedBody ? translatedBody : originalBody;
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 md:p-6 overflow-hidden animate-fade-in"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Leitor de Notícia"
     >
       <div
-        className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl p-6 sm:p-8 space-y-6 my-auto"
+        className="relative flex flex-col w-full max-w-3xl max-h-[92vh] rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
-          title="Fechar (Esc)"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        {/* Badges Header */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-md border px-2.5 py-1 text-xs font-medium ${sourceMeta.badgeClass}`}
-          >
-            {article.source.name}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium ${categoryMeta.className}`}
-          >
-            <Tag className="h-3 w-3" />
-            {categoryMeta.label}
-          </span>
+        {/* Discreet Reading Progress Bar (Section 24) */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-zinc-900 z-30">
+          <div
+            className="h-full bg-rose-500 transition-all duration-150 ease-out"
+            style={{ width: `${readingProgress}%` }}
+          />
         </div>
 
-        {/* Title */}
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-100 leading-snug">
-          {displayTitle}
-        </h2>
-
-        {/* Translation Banner (if active) */}
-        {isPtActive && (
-          <div className="flex items-center justify-between rounded-lg bg-cyan-950/30 border border-cyan-900/40 px-3 py-2 text-xs text-cyan-300">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-              Traduzido automaticamente • Português (Brasil)
-            </span>
-            <button
-              type="button"
-              onClick={() => setLanguageMode("original")}
-              className="text-cyan-400 hover:text-cyan-200 hover:underline font-medium"
-            >
-              Ver original
-            </button>
-          </div>
-        )}
-
-        {/* Informative banner when viewing original and translation is available */}
-        {!isPtActive && Boolean(translation) && (
-          <div className="flex items-center justify-between rounded-lg bg-slate-800/50 border border-slate-700/60 px-3 py-2 text-xs text-slate-300">
-            <span className="inline-flex items-center gap-1.5 text-slate-400">
-              Exibindo versão original em inglês
-            </span>
-            <button
-              type="button"
-              onClick={() => setLanguageMode("pt-br")}
-              className="text-cyan-400 hover:text-cyan-200 hover:underline font-medium"
-            >
-              Ver em Português
-            </button>
-          </div>
-        )}
-
-        {/* Translation Error Alert (if any) */}
-        {translationError && (
-          <div className="rounded-lg bg-rose-950/20 border border-rose-900/30 p-3 text-xs text-rose-300 flex items-center justify-between">
-            <span>{translationError}</span>
-            <button
-              type="button"
-              onClick={handleTranslate}
-              className="text-rose-400 hover:text-rose-200 font-medium underline ml-3 shrink-0"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        )}
-
-        {/* Action Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 border-y border-slate-800/80 py-3">
+        {/* Reader Top Navigation Bar */}
+        <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 sm:px-6 py-3 bg-zinc-950/90 shrink-0 z-20">
+          {/* Back button */}
           <button
-            onClick={toggleFavorite}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${
-              localState.is_favorite
-                ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
-                : "border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-            }`}
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors"
+            title="Voltar à Timeline (Esc)"
           >
-            <Star className={`h-3.5 w-3.5 ${localState.is_favorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
-            <span>{localState.is_favorite ? "Favoritado" : "Favoritar"}</span>
+            <ArrowLeft className="h-4 w-4 text-rose-500" />
+            <span className="hidden sm:inline">Voltar</span>
           </button>
 
-          <button
-            onClick={toggleSaved}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${
-              localState.is_saved
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                : "border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-            }`}
-          >
-            <Bookmark className={`h-3.5 w-3.5 ${localState.is_saved ? "fill-amber-400 text-amber-400" : ""}`} />
-            <span>{localState.is_saved ? "Salvo para depois" : "Ler depois"}</span>
-          </button>
+          {/* Previous / Next Navigation (Section 22) */}
+          <div className="flex items-center gap-1 text-xs">
+            <button
+              type="button"
+              onClick={onNavigatePrevious}
+              disabled={!hasPrevious}
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-zinc-300 hover:bg-zinc-900 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Notícia anterior (←)"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden md:inline">Anterior</span>
+            </button>
+            <span className="text-zinc-600 font-mono text-xs">|</span>
+            <button
+              type="button"
+              onClick={onNavigateNext}
+              disabled={!hasNext}
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-zinc-300 hover:bg-zinc-900 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Próxima notícia (→)"
+            >
+              <span className="hidden md:inline">Próxima</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
 
+          {/* Close button */}
           <button
-            onClick={toggleRead}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${
-              localState.is_read
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700"
-            }`}
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100 transition-colors"
+            title="Fechar leitor (Esc)"
           >
-            {localState.is_read ? (
-              <>
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Lido</span>
-              </>
-            ) : (
-              <>
-                <Circle className="h-3.5 w-3.5 text-slate-400" />
-                <span>Marcar como lido</span>
-              </>
-            )}
+            <X className="h-4 w-4" />
           </button>
+        </div>
 
-          {/* Language Switcher */}
-          <div className="inline-flex items-center rounded-lg border border-slate-800 bg-slate-950/80 p-0.5 text-xs">
-            <Languages className="h-3.5 w-3.5 text-slate-400 ml-2 mr-1" />
-            {translation ? (
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setLanguageMode("original")}
-                  className={`px-2.5 py-1 rounded transition-colors ${
-                    languageMode === "original"
-                      ? "bg-slate-800 text-slate-100 font-semibold"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
+        {/* Scrollable Reader Content Container */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 sm:px-8 md:px-12 py-6 space-y-6"
+        >
+          {/* Article Measure Wrapper (65-80ch optimal line length) */}
+          <div className="mx-auto max-w-[72ch] space-y-6">
+            {/* Metadata Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400 border-b border-zinc-900 pb-4">
+              <div className="flex items-center gap-2">
+                <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", sourceMeta.badgeClass)}>
+                  {article.source.name}
+                </span>
+                <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
+                  {categoryMeta.label}
+                </span>
+              </div>
+
+              {/* Language Mode Placeholder (Section 82: Prepared without external call) */}
+              <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/60 p-0.5 text-[11px] text-zinc-400">
+                <span className="rounded px-2 py-0.5 font-medium bg-zinc-800 text-zinc-200">
                   Original
-                </button>
+                </span>
+                <span
+                  className="rounded px-2 py-0.5 font-medium text-zinc-500 cursor-not-allowed opacity-60"
+                  title="Tradução PT-BR estará disponível na próxima etapa"
+                >
+                  PT-BR (em breve)
+                </span>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-50 leading-snug">
+              {article.title}
+            </h1>
+
+            {/* Author, Date & Reading Time */}
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-zinc-400">
+              {article.author && (
+                <>
+                  <span>Por <strong className="text-zinc-200">{article.author}</strong></span>
+                  <span>•</span>
+                </>
+              )}
+              <span title={fullDateFormatted}>{timeFormatted}</span>
+              {readingTime && (
+                <>
+                  <span>•</span>
+                  <span className="text-rose-400 font-semibold">{readingTime}</span>
+                </>
+              )}
+            </div>
+
+            {/* Action Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-2 text-xs">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setLanguageMode("pt-br")}
-                  className={`px-2.5 py-1 rounded transition-colors ${
-                    languageMode === "pt-br"
-                      ? "bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
+                  onClick={toggleFavorite}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors border",
+                    localState.is_favorite
+                      ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200"
+                  )}
                 >
-                  PT-BR
+                  <Star className={cn("h-3.5 w-3.5", localState.is_favorite && "fill-yellow-400 text-yellow-400")} />
+                  <span>{localState.is_favorite ? "Favoritado" : "Favoritar"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleSaved}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-colors border",
+                    localState.is_saved
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                      : "border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200"
+                  )}
+                >
+                  <Bookmark className={cn("h-3.5 w-3.5", localState.is_saved && "fill-amber-400 text-amber-400")} />
+                  <span>{localState.is_saved ? "Salvo" : "Ler depois"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleRead}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 border border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:text-zinc-200 transition-colors"
+                >
+                  {localState.is_read ? (
+                    <>
+                      <Circle className="h-3.5 w-3.5 text-rose-400" />
+                      <span>Marcar não lido</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Marcar lido</span>
+                    </>
+                  )}
                 </button>
               </div>
-            ) : (
+
               <button
                 type="button"
-                onClick={handleTranslate}
-                disabled={isTranslating}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-cyan-400 hover:text-cyan-300 hover:bg-cyan-950/30 transition-colors disabled:opacity-50"
+                onClick={handleHide}
+                className="inline-flex items-center gap-1 text-zinc-500 hover:text-rose-400 transition-colors text-[11px] px-2 py-1"
+                title="Ocultar esta matéria da timeline"
               >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin text-cyan-400" />
-                    <span>Traduzindo...</span>
-                  </>
-                ) : (
-                  <span>Traduzir para Português</span>
-                )}
+                <EyeOff className="h-3.5 w-3.5" />
+                <span>Ocultar</span>
               </button>
+            </div>
+
+            {/* Optional Lead Image */}
+            {hasValidImage && (
+              <div className="overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={article.image_url!}
+                  alt={article.title}
+                  onError={() => setImageError(true)}
+                  className="w-full max-h-96 object-cover"
+                  loading="lazy"
+                />
+              </div>
             )}
-          </div>
 
-          <button
-            onClick={handleHide}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border border-slate-800 bg-slate-900 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 transition-colors ml-auto"
-            title="Ocultar da timeline"
-          >
-            <EyeOff className="h-3.5 w-3.5" />
-            <span>Ocultar</span>
-          </button>
-        </div>
-
-        {/* Cover Image */}
-        {hasValidImage && (
-          <div className="overflow-hidden rounded-xl bg-slate-950 max-h-72">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={article.image_url!}
-              alt={article.title}
-              onError={() => setImageError(true)}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
-
-        {/* Metadata bar */}
-        <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
-          {article.author && (
-            <div className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-slate-500" />
-              <span>Por {article.author}</span>
+            {/* Main Content / Summary (65-80ch reading width) */}
+            <div className="text-zinc-200 text-base sm:text-[17px] leading-relaxed space-y-4 pt-2">
+              {contentBody ? (
+                <div className="prose prose-invert max-w-none text-zinc-300 leading-relaxed space-y-4">
+                  {contentBody.split("\n\n").map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-center space-y-2 text-zinc-400">
+                  <Newspaper className="mx-auto h-8 w-8 text-zinc-600" />
+                  <p>O feed desta publicação disponibilizou apenas o título e link externo.</p>
+                </div>
+              )}
             </div>
-          )}
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 text-slate-500" />
-            <span>{formattedDate}</span>
-          </div>
 
-          {article.metrics?.score !== null && article.metrics?.score !== undefined && (
-            <div className="flex items-center gap-1 text-amber-400 font-medium">
-              <ThumbsUp className="h-3.5 w-3.5" />
-              <span>{article.metrics.score} pontos</span>
+            {/* External Source Action Box */}
+            <div className="pt-8 border-t border-zinc-800/80">
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-between w-full rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-rose-500/40 p-4 transition-all group"
+              >
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-zinc-100 group-hover:text-rose-400 transition-colors">
+                    Ler matéria completa na fonte original
+                  </p>
+                  <p className="text-xs text-zinc-500 font-mono">
+                    {article.url}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-zinc-800 p-2 text-zinc-400 group-hover:bg-rose-500/10 group-hover:text-rose-400 transition-colors">
+                  <ExternalLink className="h-4 w-4" />
+                </div>
+              </a>
             </div>
-          )}
-          {article.metrics?.comments !== null && article.metrics?.comments !== undefined && (
-            <div className="flex items-center gap-1 text-cyan-400 font-medium">
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>{article.metrics.comments} comentários</span>
-            </div>
-          )}
-        </div>
-
-        {/* Summary or Content */}
-        <div className="space-y-4">
-          <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed">
-            {displayBody ? (
-              <p className="whitespace-pre-line leading-relaxed">{displayBody}</p>
-            ) : (
-              <p className="italic text-slate-500">
-                Esta fonte disponibiliza a matéria e discussão diretamente no link original externo.
-              </p>
-            )}
           </div>
-
-          {/* Legal / Source notice */}
-          <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 text-xs text-slate-500 flex items-center justify-between">
-            <span>Conteúdo disponibilizado pelo feed da publicação.</span>
-            <span className="font-mono text-[10px] text-slate-600">Direitos reservados ao autor</span>
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="pt-4 border-t border-slate-800/80 flex justify-between items-center">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-800 transition-colors"
-          >
-            Fechar
-          </button>
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-900 font-semibold px-4 py-2 text-sm transition-all shadow-lg shadow-cyan-950"
-          >
-            <span>Abrir artigo original</span>
-            <ExternalLink className="h-4 w-4" />
-          </a>
         </div>
       </div>
     </div>

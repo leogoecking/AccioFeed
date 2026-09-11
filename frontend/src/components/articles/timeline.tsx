@@ -653,14 +653,27 @@ export function Timeline({
       )}
 
       {/* Article Reader Modal */}
-      {selectedArticle && (
-        <ArticleModal
-          article={selectedArticle}
-          onClose={handleCloseModal}
-          onStateChange={handleArticleStateChange}
-          onHide={handleArticleHide}
-        />
-      )}
+      {selectedArticle && (() => {
+        const selectedIndex = articles.findIndex((a) => a.id === selectedArticle.id);
+        const hasPrev = selectedIndex > 0;
+        const hasNxt = selectedIndex !== -1 && selectedIndex < articles.length - 1;
+        return (
+          <ArticleModal
+            article={selectedArticle}
+            onClose={handleCloseModal}
+            onNavigatePrevious={() => {
+              if (hasPrev) setSelectedArticle(articles[selectedIndex - 1]);
+            }}
+            onNavigateNext={() => {
+              if (hasNxt) setSelectedArticle(articles[selectedIndex + 1]);
+            }}
+            hasPrevious={hasPrev}
+            hasNext={hasNxt}
+            onStateChange={handleArticleStateChange}
+            onHide={handleArticleHide}
+          />
+        );
+      })()}
     </section>
   );
 }
