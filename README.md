@@ -1,81 +1,129 @@
-# Tech News Hub ⚡
+# AccioFeed_ ⚡
 
-> Agregador inteligente e self-hosted de notícias e conteúdos sobre tecnologia.
+> Agregador pessoal, minimalista, editorial e self-hosted de notícias e discussões de tecnologia.
+
+```
+   •   •
+ ↘ ↓ ↙
+  ◉
+ ACCIOFEED_
+```
 
 ---
 
 ## 1. Visão Geral
 
-O **Tech News Hub** é um leitor inteligente e self-hosted de notícias e discussões sobre tecnologia. O sistema centraliza, normaliza e apresenta as novidades do ecossistema tech em uma interface moderna, minimalista e com dark mode por padrão.
+O **AccioFeed_** é um leitor diário de notícias tecnológicas projetado para ser ultra-rápido, ergonômico e sem ruídos visuais. Construído com arquitetura dark-first em preto e vermelho editorial (`#09090b` e `#e11d48`), ele centraliza, normaliza e apresenta artigos de fontes oficiais em uma experiência de navegação por teclado instantânea.
 
 ### Principais Funcionalidades:
-- 📰 **Timeline Multi-Fonte**: Notícias consolidadas de APIs oficiais (Hacker News) e feeds RSS/Atom de tecnologia de ponta.
-- 📖 **Experiência do Leitor (Reader View)**: Modal de leitura focado, sem distrações, com marcação automática de abertura e links diretos para a fonte original.
+
+- 📰 **Timeline Multi-Fonte com Zero Jumping**:
+  - Detecção de novidades em segundo plano sem deslocamento involuntário de scroll (*Zero Timeline Jumping*). Um botão flutuante discreto `↑ X novas notícias disponíveis` permite carregar novidades quando o leitor desejar.
+  - Indicador de **"Novas desde sua última visita"** com separador visual **`VOCÊ JÁ VIU ATÉ AQUI`** e ação de marcação temporal em lote.
+  - Alternância instantânea de densidade: modo **Confortável** (cards com lead image e resumo) e modo **Compacto** (linhas condensadas para varredura ultrarrápida), persistido em `localStorage`.
+  - Paginação contínua e fluida via botão **Carregar mais notícias** preservando a posição de leitura.
+
+- 📖 **Experiência de Leitura Focada (Reader View)**:
+  - Calibrado ergonomicamente para largura ideal de leitura (65 a 80 caracteres / `max-w-[72ch]`).
+  - Barra de progresso de leitura sutil no topo do modal.
+  - Cálculo de tempo estimado de leitura determinístico (200 wpm).
+  - Navegação entre artigos via setas (`←` Anterior / `→` Próxima) com marcação automática de leitura.
+  - **Preservação absoluta de scroll**: retornar da leitura restaura a posição exata da timeline.
+
+- ⚡ **Power Navigation & Atalhos Rápidos**:
+  - **Quick Preview**: Painel lateral deslizante à direita no desktop (mantendo a timeline visível) e bottom sheet acessível no mobile para inspecionar resumos sem sair do contexto.
+  - **Command Palette Global (`Ctrl+K` / `⌘+K`)**: Busca rápida e pulo para coleções, categorias e ações do sistema.
+  - **Navegação Estilo Vim**: `j` e `k` percorrem os artigos com anel de destaque e scroll suave.
+  - **Atalhos Rápidos**: `Enter`/`o` abre o Reader, `Space`/`p` abre o Quick Preview, `s` salva para ler depois, `f` favorita, `m` alterna lido/não lido, `r` sincroniza e `?` exibe a ajuda de atalhos.
+
 - 📚 **Coleções Pessoais**:
-  - **Tudo**: visão consolidada de todos os artigos não ocultados.
-  - **Não lidos**: feed com artigos ainda não lidos e contador em tempo real.
-  - **Ler depois**: coleção de artigos marcados para leitura futura com data de salvamento.
-  - **Favoritos**: biblioteca de artigos destacados com estrela.
-  - **Histórico**: cronologia de artigos abertos ordenados por última leitura (`last_opened_at`).
-  - **Ocultação de Notícias**: capacidade de esconder itens irrelevantes da timeline.
-- 🌐 **Tradução Opcional para Português (PT-BR)**:
-  - Tradução sob demanda no leitor via API oficial do **DeepL** (Free ou Pro).
-  - Cache relacional persistente no PostgreSQL: cada notícia é traduzida no máximo uma vez.
-  - Alternância instantânea entre texto original e traduzido (`Original | PT-BR`).
-  - Detecção inteligente: notícias que já estão em português são identificadas e não consomem cotas externas.
-  - Resiliência total: em caso de indisponibilidade externa ou cota esgotada, a leitura do original permanece 100% acessível.
+  - **Tudo**: visão de todos os artigos não ocultados.
+  - **Não lidos**: feed limpo apenas com artigos pendentes e contador em tempo real.
+  - **Ler depois**: coleção de artigos marcados para leitura futura.
+  - **Favoritos**: biblioteca de matérias destacadas.
+  - **Histórico**: cronologia de artigos lidos ordenados por `last_opened_at`.
+  - **Ocultação de Notícias**: esconde itens irrelevantes da timeline.
+
 - ⚙️ **Gerenciamento de Fontes Dinâmico (`/sources`)**:
   - Monitoramento operacional de saúde (Healthy, Warning, Error, Disabled).
   - Ativação e desativação em tempo real com toggle switch.
   - Sincronização sob demanda (individual por fonte ou global para todas as ativas) com lock assíncrono.
   - Cadastro de novos feeds RSS com validação ao vivo, extração de metadados e preview prévio.
-- 🛡️ **Segurança em Camadas**:
-  - Proteção estrita contra **SSRF** (bloqueio de RFC 1918, loopback, link-local, `169.254.169.254`, validação em cada redirect HTTP).
+
+- 🛡️ **Segurança em Camadas & Performance**:
+  - Proteção estrita contra **SSRF** (bloqueio de redes privadas RFC 1918, loopback, metadados cloud, anti-redirect e limites de payload).
   - Sanitização profunda contra **XSS** em resumos e conteúdos.
+  - Otimização de payload: defer de carregamento de conteúdo integral em consultas de listagem (`defer(Article.content)`).
+  - Debouncing de 300ms no input de busca para digitação 100% responsiva sem rajadas de requisições.
 
 ---
 
-## 2. Stack Tecnológica
+## 2. Atalhos de Teclado
 
-- **Frontend**: Next.js 15+ (App Router), React, TypeScript, Tailwind CSS, Lucide Icons.
+| Tecla | Ação |
+| :--- | :--- |
+| `j` | Avançar para o próximo artigo na timeline |
+| `k` | Voltar para o artigo anterior na timeline |
+| `Enter` ou `o` | Abrir artigo selecionado no Reader focado |
+| `Espaço` ou `p` | Abrir visualização rápida lateral (Quick Preview) |
+| `s` | Salvar / remover artigo de Ler Depois |
+| `f` | Favoritar / desfavoritar artigo selecionado |
+| `m` | Alternar estado lido / não lido do artigo |
+| `←` / `→` | No Reader: navegar para artigo anterior / próximo |
+| `Ctrl+K` / `⌘+K` | Abrir Command Palette (busca e ações) |
+| `r` | Sincronizar notícias com fontes oficiais |
+| `?` | Exibir janela de ajuda com todos os atalhos |
+| `Esc` | Fechar modal, Reader, Quick Preview ou limpar busca |
+
+---
+
+## 3. Stack Tecnológica
+
+- **Frontend**: Next.js 15+ (App Router), React 19, TypeScript, Tailwind CSS v4, Lucide Icons.
 - **Backend**: Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2.0 (asyncpg), Alembic, HTTPX.
 - **Banco de Dados**: PostgreSQL 16.
 - **Workers / Jobs**: Processo Worker assíncrono independente para coleta periódica sem sobrecarga da API HTTP.
-- **Infraestrutura**: Docker & Docker Compose.
-- **Qualidade & CI**: Ruff, Pytest, ESLint, TypeScript Strict, GitHub Actions.
+- **Infraestrutura**: Docker & Docker Compose com hot-reload ativo (`docker-compose.override.yml`).
+- **Qualidade & CI**: Ruff, Pytest (83 testes automatizados), ESLint, TypeScript Strict, GitHub Actions.
 
 ---
 
-## 3. Estrutura do Projeto
+## 4. Estrutura do Projeto
 
 ```text
-tech-news-hub/
+acciofeed/
 ├── .github/workflows/       # Pipelines de CI (backend e frontend)
 ├── backend/
 │   ├── app/
 │   │   ├── api/             # Controllers e roteamento REST (/health, /api/v1)
-│   │   ├── core/            # Configurações, logging estruturado, banco assíncrono
-│   │   ├── models/          # Entidades SQLAlchemy (Source, Article, ArticleMetric)
+│   │   ├── core/            # Configurações, logging estruturado, banco assíncrono, SSRF
+│   │   ├── models/          # Entidades SQLAlchemy (Source, Article, ArticleMetric, State)
 │   │   ├── schemas/         # Modelos Pydantic v2 de validação e serialização
-│   │   ├── repositories/    # Camada de persistência desacoplada
+│   │   ├── repositories/    # Camada de persistência desacoplada (otimizada com defer)
 │   │   ├── services/        # Regras de negócio (ingestão, deduplicação, consulta)
 │   │   ├── sources/         # Abstração SourceProvider e integrações (Hacker News, RSS)
 │   │   └── workers/         # Agendador e processo worker independente
 │   ├── migrations/          # Versionamento de schema com Alembic
 │   ├── tests/               # Testes automatizados unitários e de integração com pytest
 │   ├── Dockerfile           # Imagem Docker otimizada do backend/worker
+│   ├── entrypoint.sh        # Suporte automático a --reload quando DEBUG=true
 │   ├── pyproject.toml       # Configuração do Ruff, pytest e dependências
 │   └── requirements.txt     # Dependências fixadas
 ├── frontend/
 │   ├── src/
 │   │   ├── app/             # Next.js App Router (páginas, layout, tema)
-│   │   ├── components/      # Componentes modulares (timeline, cards, filtros, sidebar)
+│   │   ├── components/      # Componentes modulares
+│   │   │   ├── articles/    # Timeline, ArticleCard, ArticleModal (Reader)
+│   │   │   ├── navigation/  # QuickPreview, CommandPalette, ShortcutsHelpModal
+│   │   │   ├── layout/      # BrandLogo, Header, Sidebar
+│   │   │   └── common/      # ApiConfigBanner
 │   │   └── lib/             # Cliente API, tipos TypeScript e utilitários
-│   ├── Dockerfile           # Imagem multi-stage do frontend
+│   ├── Dockerfile           # Imagem multi-stage (suporte a target dev com npm run dev)
 │   └── package.json         # Dependências do frontend
 ├── docs/
 │   └── architecture.md      # Registro de decisões arquiteturais (ADRs)
-├── docker-compose.yml       # Orquestração local de todos os serviços
+├── docker-compose.yml       # Orquestração de produção/base de todos os serviços
+├── docker-compose.override.yml # Montagem de volumes locais para Hot-Reload instantâneo
 ├── .env.example             # Modelo de variáveis de ambiente
 ├── AGENTS.md                # Diretrizes operacionais para agentes e devs
 ├── roadmap.md               # Planejamento de fases e evolução futura
@@ -84,251 +132,55 @@ tech-news-hub/
 
 ---
 
-## 4. Requisitos
-
-- [Docker](https://docs.docker.com/get-docker/) (24+) e [Docker Compose](https://docs.docker.com/compose/) (v2+)
-- Opcional para desenvolvimento local sem Docker:
-  - Python 3.12+
-  - Node.js 20+ e npm
-  - PostgreSQL 16
-
----
-
 ## 5. Como Executar com Docker Compose
 
-1. **Clone o repositório e acesse o diretório**:
-   ```bash
-   git clone https://github.com/usuario/tech-news-hub.git
-   cd tech-news-hub
-   ```
-
-2. **Copie o arquivo de ambiente**:
-   ```bash
-   cp .env.example .env
-   ```
-   > Por padrão, o `.env.example` mapeia o frontend para a porta `3001` e o backend para a porta `8001`, prevenindo conflitos com eventuais containers locais pré-existentes.
-
-3. **Inicie todos os serviços**:
-   ```bash
-   docker compose up --build
-   ```
-
-4. **Acesse as aplicações**:
-   - **Frontend (Dashboard)**: [http://localhost:3001](http://localhost:3001)
-   - **API Backend**: [http://localhost:8001](http://localhost:8001)
-   - **Documentação Swagger (OpenAPI)**: [http://localhost:8001/docs](http://localhost:8001/docs)
-   - **Healthcheck**: [http://localhost:8001/health](http://localhost:8001/health)
-
----
-
-## 6. Fontes Integradas
-
-O Tech News Hub agrega notícias de fontes oficiais, tanto via API quanto via feeds RSS/Atom padronizados:
-
-| Fonte | Tipo | Categoria Padrão | Intervalo de Coleta | URL Base / Feed |
-| :--- | :--- | :--- | :--- | :--- |
-| **Hacker News** | API (`hacker_news`) | `technology` | 5 min | `https://news.ycombinator.com` |
-| **Ars Technica** | RSS (`rss`) | `technology` | 15 min | `https://feeds.arstechnica.com/arstechnica/index` |
-| **The Verge** | RSS (`rss`) | `technology` | 15 min | `https://www.theverge.com/rss/index.xml` |
-| **Tom's Hardware** | RSS (`rss`) | `hardware` | 15 min | `https://www.tomshardware.com/feeds/all` |
-| **MIT Technology Review** | RSS (`rss`) | `ai` | 30 min | `https://www.technologyreview.com/feed/` |
-| **IEEE Spectrum** | RSS (`rss`) | `science` | 30 min | `https://spectrum.ieee.org/feeds/feed.rss` |
-| **GitHub Blog** | RSS (`rss`) | `dev` | 30 min | `https://github.blog/feed/` |
-| **Phoronix** | RSS (`rss`) | `linux` | 15 min | `https://www.phoronix.com/phoronix-rss.php` |
-
----
-
-## 7. CLI de Coleta e Sincronização Manual
-
-Além do Worker assíncrono em background (que roda a cada `WORKER_INTERVAL_SECONDS` respeitando o `poll_interval_minutes` de cada fonte), você pode disparar comandos manuais via CLI:
-
+### 1. Clonar o repositório e preparar ambiente
 ```bash
-# Sincronização forçada imediata de todas as fontes ativas:
-docker compose exec backend python -m app.cli sync
-
-# Sincronização respeitando as regras de intervalo (apenas fontes com coleta pendente):
-docker compose exec backend python -m app.cli sync --no-force
-
-# Popular/atualizar o catálogo de fontes padrão (idempotente):
-docker compose exec backend python -m app.cli seed
+cp .env.example .env
 ```
 
-Exemplo de saída da sincronização:
-```text
-========================================
-         Tech News Hub Sync             
-========================================
-
-Ars Technica
-  Status: SUCCESS (789ms)
-  Fetched: 20
-  New: 20
-  Duplicates: 0
-
-...
-
-----------------------------------------
-Sources: 8
-Success: 8
-Failed: 0
-New articles: 140
-========================================
-```
-
----
-
-## 8. Gerenciamento de Fontes e Adição de Feeds Customizados
-
-O sistema suporta tanto gerenciamento visual via interface web quanto via CLI ou banco de dados:
-
-### 8.1. Pela Interface Web (`/sources`):
-1. Acesse [http://localhost:3001/sources](http://localhost:3001/sources) ou clique em **"Gerenciar Fontes"** na barra lateral.
-2. Visualize o status operacional de cada fonte:
-   - 🟢 **Saudável**: Coleta recente bem-sucedida.
-   - 🟡 **Aviso**: Fonte ativa com coletas pendentes ou avisos transitórios.
-   - 🔴 **Erro**: Falha na última coleta (com exibição da mensagem de erro amigável).
-   - ⚪ **Desativada**: Fonte desabilitada pelo usuário.
-3. **Ativar / Desativar**: Alterne o botão toggle na coluna Status. O Worker respeitará imediatamente a alteração.
-4. **Sincronização Manual**: Clique no ícone de atualização ao lado de qualquer fonte, ou use o botão **"Sincronizar Todas"** no topo.
-5. **Adicionar Feed RSS**:
-   - Clique em **"Adicionar Fonte RSS"**.
-   - Digite a URL do feed e clique em **"Validar Feed"**.
-   - O backend executará checagens rigorosas contra SSRF, resolverá o DNS e baixará uma amostra do feed, exibindo um card de preview com título, formato detectado e os primeiros artigos encontrados.
-   - Escolha o nome da fonte, a categoria padrão e o intervalo de coleta e confirme a criação.
-
-### 8.2. Proteção contra SSRF (Server-Side Request Forgery):
-Ao adicionar ou validar feeds externos, o sistema bloqueia:
-- Endereços IP locais e privados (`127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `0.0.0.0`).
-- Endereços de metadados em nuvens AWS/GCP/Azure (`169.254.169.254`).
-- Redirecionamentos HTTP 3xx para redes internas (validação iterativa em cada hop).
-- Payloads excessivos (limite estrito de 5 MB com streaming chunked) e timeout de 10s.
-
----
-
-## 9. Como Configurar a Tradução Opcional (DeepL)
-
-O Tech News Hub inclui suporte nativo e opcional para tradução sob demanda de artigos para **Português do Brasil (`pt-BR`)** através do provedor **DeepL**:
-
-### 9.1. Ativação no `.env`:
-Por padrão, a tradução vem desativada (`TRANSLATION_ENABLED=false`) e o agregador opera normalmente sem depender de nenhuma chave externa.
-
-Para habilitar a tradução:
-```env
-TRANSLATION_ENABLED=true
-TRANSLATION_PROVIDER=deepl
-TRANSLATION_API_KEY=sua-chave-aqui:fx
-TRANSLATION_TARGET_LANGUAGE=pt-BR
-TRANSLATION_TIMEOUT_SECONDS=10
-```
-
-> **Como obter uma chave gratuita do DeepL**:
-> 1. Crie uma conta no plano gratuito [DeepL API Free](https://www.deepl.com/pro-api).
-> 2. O plano Free concede **500.000 caracteres gratuitos por mês** (suficiente para traduzir centenas de resumos técnicos).
-> 3. Chaves gratuitas possuem o sufixo `:fx` e o sistema conecta automaticamente ao endpoint `https://api-free.deepl.com/v2/translate`. Chaves Pro conectam automaticamente a `https://api.deepl.com/v2/translate`.
-
-### 9.2. Características de Economia e Segurança:
-- **Tradução Estritamente Sob Demanda**: Apenas artigos abertos no leitor e cujo botão "Traduzir para Português" for clicado são enviados para a API externa. Nenhuma tradução em massa ocorre na timeline ou na coleta de feeds.
-- **Cache Persistente no PostgreSQL**: O resultado é gravado na tabela `article_translations`. Aberturas subsequentes do mesmo artigo são lidas diretamente do banco sem qualquer custo ou latência externa.
-- **Proteção contra Concorrência**: Múltiplas requisições simultâneas para o mesmo artigo compartilham um lock assíncrono em memória, realizando exatamente uma única chamada externa.
-- **Detecção Inteligente de Idioma**: Matérias publicadas em português são detectadas heuristicamente e salvas localmente sem consumir sua cota da API.
-- **Fallback Resiliente**: Se a chave for inválida, a cota mensal acabar ou a rede falhar, uma mensagem amigável é exibida e o conteúdo original em inglês permanece 100% legível.
-- **Segurança de Credenciais**: Chaves de API nunca são expostas ao frontend nem gravadas em logs.
-
----
-
-## 10. Endpoints da API REST
-
-A API expõe endpoints versionados sob `/api/v1`:
-
-### Artigos e Biblioteca Pessoal
-- `GET /health`: Healthcheck detalhado do serviço e conectividade com o banco.
-- `GET /api/v1/library/stats`: Estatísticas agregadas da biblioteca pessoal em uma única query (`unread`, `saved`, `favorites`, `total`).
-- `GET /api/v1/articles`: Listagem paginada de artigos com múltiplos filtros:
-  - `state` (`all`, `unread`, `favorite`, `saved`, `hidden`, `history`)
-  - `source` (slug da fonte, ex: `ars-technica`, `phoronix`, `hacker-news`)
-  - `category` (`ai`, `hardware`, `dev`, `linux`, `security`, `science`, `startups`, `technology`)
-  - `search` (busca textual em título ou resumo)
-  - `sort` (`recent`, `popular`, `history`, `last_opened`)
-  - `timeframe` (`24h`, `7d`, `30d`, `all`)
-  - `page` e `page_size` (máx: 100)
-- `GET /api/v1/articles/{id}`: Detalhes completos de um artigo individual.
-- `PATCH /api/v1/articles/{id}/state`: Atualiza o estado pessoal do artigo (`is_read`, `is_favorite`, `is_saved`, `is_hidden`).
-- `POST /api/v1/articles/{id}/open`: Registra a abertura do artigo no leitor (marca automaticamente como lido e atualiza `first_opened_at` / `last_opened_at`).
-
-### Tradução de Artigos
-- `GET /api/v1/articles/{id}/translations?language=pt-BR`: Consulta a tradução em cache de um artigo. Retorna 404 se ainda não traduzido.
-- `POST /api/v1/articles/{id}/translations`: Dispara a tradução sob demanda do artigo (verificando cache prévio, aplicando locks de concorrência e persistindo no banco).
-
-### Fontes e Coleta
-- `GET /api/v1/sources`: Listagem de fontes com status calculado (`healthy`, `error`, `disabled`) e métricas de execução.
-- `POST /api/v1/sources`: Cadastro de nova fonte RSS/Atom customizada com validação prévia.
-- `PATCH /api/v1/sources/{id}`: Atualização de atributos da fonte (`is_active`, `poll_interval_minutes`, `default_category`, etc.).
-- `POST /api/v1/sources/validate`: Validação de URL de feed com proteção SSRF e extração de preview.
-- `POST /api/v1/sources/{id}/sync`: Disparo de sincronização manual imediata para uma fonte específica (com lock de concorrência).
-- `POST /api/v1/sources/sync`: Disparo de sincronização manual de todas as fontes ativas.
-- `GET /api/v1/categories`: Lista das categorias suportadas pela plataforma.
-
----
-
-## 10. Migrações de Banco de Dados (Alembic)
-
-O container da API executa automaticamente `alembic upgrade head` durante a inicialização.
-
-Para criar uma nova migração manualmente:
+### 2. Iniciar todos os serviços (Hot-Reload Habilitado)
 ```bash
-docker compose exec backend alembic revision --autogenerate -m "descricao_da_migracao"
+docker compose up -d
 ```
 
-Para aplicar manualmente as migrações:
-```bash
-docker compose exec backend alembic upgrade head
-```
+Os seguintes serviços estarão disponíveis:
+- **Interface Web**: [http://localhost:3001](http://localhost:3001)
+- **API FastAPI**: [http://localhost:8001](http://localhost:8001)
+- **Documentação Interativa Swagger**: [http://localhost:8001/docs](http://localhost:8001/docs)
+- **Healthcheck da API**: [http://localhost:8001/health](http://localhost:8001/health)
+- **PostgreSQL**: `localhost:5433`
+
+Alterações realizadas em arquivos dentro de `frontend/` e `backend/` são refletidas **instantaneamente** no navegador e na API sem necessidade de rebuild dos containers.
 
 ---
 
-## 11. Testes e Qualidade de Código
+## 6. Testes e Verificação de Qualidade
 
 ### Backend
 ```bash
-# Executar suíte de testes unitários e de integração
+# Executar suíte de testes unitários e de integração (83 testes)
 docker compose exec backend pytest
 
-# Executar linter e formatação
+# Executar linter e formatação com Ruff
 docker compose exec backend ruff check .
 docker compose exec backend ruff format --check .
 ```
 
 ### Frontend
 ```bash
-# Executar linter
+# Executar ESLint (0 erros, 0 avisos)
 npm run lint --prefix frontend
 
-# Executar typecheck e build
+# Executar verificação de tipos TypeScript
+npx tsc --noEmit --prefix frontend
+
+# Compilar build de produção
 npm run build --prefix frontend
 ```
 
 ---
 
-## 12. Variáveis de Ambiente Principais
-
-| Variável | Padrão | Descrição |
-| :--- | :--- | :--- |
-| `FRONTEND_PORT` | `3001` | Porta HTTP exposta no host para a interface web |
-| `BACKEND_PORT` | `8001` | Porta HTTP exposta no host para a API FastAPI |
-| `POSTGRES_PORT` | `5433` | Porta exposta no host para o PostgreSQL |
-| `DATABASE_URL` | `postgresql+asyncpg://...` | String de conexão assíncrona com o banco |
-| `WORKER_INTERVAL_SECONDS` | `300` | Intervalo em segundos entre ciclos do coletor |
-| `HN_MAX_STORIES` | `30` | Quantidade de histórias por lote na coleta do Hacker News |
-| `HTTP_REQUEST_TIMEOUT` | `15` | Timeout em segundos para requisições externas HTTP |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8001` | URL base da API consumida pelo frontend |
-| `TRANSLATION_ENABLED` | `false` | Habilita ou desabilita o serviço de tradução sob demanda |
-| `TRANSLATION_PROVIDER` | `deepl` | Identificador do provedor de tradução utilizado |
-| `TRANSLATION_API_KEY` | `""` | Chave de autenticação da API de tradução (Free ou Pro) |
-| `TRANSLATION_TARGET_LANGUAGE` | `pt-BR` | Idioma de destino padrão para as traduções |
-| `TRANSLATION_TIMEOUT_SECONDS` | `10` | Timeout estrito para requisições ao provedor de tradução |
-
----
-
-## 13. Licença
+## 7. Licença
 
 Projeto desenvolvido sob a licença MIT.

@@ -188,6 +188,30 @@ O **Tech News Hub** é um agregador inteligente e self-hosted de notícias e dis
   - **Resiliência e Concorrência**: Requisições simultâneas para o mesmo artigo compartilham um lock assíncrono em memória (`_get_lock`), garantindo que apenas uma chamada à API externa seja feita. Se o serviço falhar (timeout, erro 500, cota esgotada), o usuário visualiza uma notificação discreta e pode continuar lendo o texto original sem bloqueio.
 - **Consequência**: Experiência fluida, sem custos acidentais, mantendo o texto original sempre disponível com opção de alternar entre `Original` e `PT-BR`.
 
+### ADR 08: AccioFeed_ Editorial Experience & Power Navigation
+- **Problema**: Agregadores de notícias tradicionais frequentemente sofrem com layout shifts ("timeline jumping" ao sincronizar), falta de atalhos rápidos de teclado, leitura truncada ou poluída por elementos desnecessários.
+- **Alternativas**:
+  1. Carregamento e substituição automática dos itens na tela quando novos artigos chegam.
+  2. Interface estática sem navegação por teclado e sem painéis rápidos.
+  3. Sistema de Power Navigation com Zero Timeline Jumping, Command Palette (`Ctrl+K`), Quick Preview lateral, Reader calibrado (65-80ch) e atalhos completos estilo vim (`j`/`k`, `o`, `Space`, `s`, `f`, `m`).
+- **Escolha**: Sistema de Power Navigation com Zero Timeline Jumping e Quick Preview.
+- **Justificativa**:
+  - **Zero Timeline Jumping**: Polling em background detecta artigos novos sem deslocar o scroll da timeline do usuário, exibindo um botão flutuante amigável `↑ X novas notícias disponíveis`.
+  - **Quick Preview Lateral**: Painel deslizante à direita no desktop e bottom sheet no mobile, permitindo inspecionar resumos e metadados sem sair do contexto da timeline.
+  - **Atalhos e Command Palette**: `j`/`k` com destaque visual e scroll suave, `Enter`/`o` para Reader, `Space`/`p` para Quick Preview, `Ctrl+K` para busca/comandos rápidos, com proteção estrita contra digitação em inputs.
+  - **Preservação do Scroll**: Armazenamento e restauração da posição exata de `window.scrollY` ao abrir e fechar o leitor.
+- **Consequência**: Leitura ultrarrápida, ergonômica e focada.
+
+### ADR 09: Otimização de Consultas de Timeline e Debouncing de Busca
+- **Problema**: Ao listar dezenas de artigos na timeline, retornar o campo `content` (HTML ou texto integral) gera payloads de centenas de kilobytes por requisição. Além disso, buscas parciais sem debouncing disparam requisições a cada tecla digitada.
+- **Alternativas**:
+  1. Carregar todos os campos em todas as rotas e disparar busca a cada tecla.
+  2. Adicionar GraphQL ou endpoints separados.
+  3. Aplicar `defer(Article.content)` na consulta SQLAlchemy da timeline e implementar debouncing de 300ms no input de busca frontend, mantendo carregamento completo de `content` apenas na abertura do artigo (`/articles/{id}`).
+- **Escolha**: `defer(Article.content)` no repositório + extração segura em `ArticlePublic` + debouncing de 300ms no frontend.
+- **Justificativa**: Reduz drasticamente o tamanho do payload JSON na timeline (de centenas de KB para poucos KB), economizando banda e tempo de renderização no cliente. O debouncing de 300ms garante digitação 100% fluida enquanto previne rajadas de requisições ao backend.
+- **Consequência**: Timeline ultra responsiva mesmo em redes móveis ou conexões lentas.
+
 ---
 
 ## 4. Segurança e Resiliência
