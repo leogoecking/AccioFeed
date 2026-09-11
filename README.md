@@ -136,6 +136,8 @@ acciofeed/
 
 ### 1. Clonar o repositório e preparar ambiente
 ```bash
+git clone https://github.com/leogoecking/AccioFeed.git
+cd AccioFeed
 cp .env.example .env
 ```
 
@@ -159,7 +161,7 @@ Alterações realizadas em arquivos dentro de `frontend/` e `backend/` são refl
 
 ### Backend
 ```bash
-# Executar suíte de testes unitários e de integração (83 testes)
+# Executar suíte de testes unitários e de integração (86 testes)
 docker compose exec backend pytest
 
 # Executar linter e formatação com Ruff
