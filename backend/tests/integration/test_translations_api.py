@@ -327,3 +327,33 @@ async def test_translation_service_none_language():
         result = await service.translate_article(uuid.uuid4(), "pt-BR")
         assert result is not None
         mock_provider.translate_article.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_client_provided_translation_persists_in_cache(
+    async_client: AsyncClient,
+    sample_article,
+):
+    article_id = str(sample_article.id)
+    payload = {
+        "language": "pt-BR",
+        "translated_title": "Título traduzido no cliente",
+        "translated_summary": "Resumo traduzido no cliente",
+        "provider": "mymemory_client",
+        "detected_source_language": "EN",
+    }
+
+    res = await async_client.post(
+        f"/api/v1/articles/{article_id}/translations",
+        json=payload,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["translated_title"] == "Título traduzido no cliente"
+    assert data["translated_summary"] == "Resumo traduzido no cliente"
+    assert data["provider"] == "mymemory_client"
+
+    # Subsequent GET returns the cached translation
+    get_res = await async_client.get(f"/api/v1/articles/{article_id}/translations?language=pt-BR")
+    assert get_res.status_code == 200
+    assert get_res.json()["translated_title"] == "Título traduzido no cliente"

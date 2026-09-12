@@ -381,22 +381,90 @@ export async function fetchArticleTranslation(
   }
 }
 
+async function clientTranslateText(text: string, langpair: string = "en|pt-BR"): Promise<string> {
+  if (!text || !text.trim()) return text;
+  // Use client-side MyMemory from residential IP directly (CORS is supported by MyMemory)
+  const clean = text.trim().slice(0, 480);
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=${langpair}&de=contact@acciofeed.app`;
+  const resp = await fetch(url);
+  if (!resp.ok) return text;
+  const json = await resp.json();
+  return json?.responseData?.translatedText || text;
+}
+
 export async function translateArticle(
   articleId: string,
-  language: string = "pt-BR"
+  language: string = "pt-BR",
+  fallbackArticle?: { title: string; summary?: string | null; content?: string | null }
 ): Promise<ArticleTranslationPublic> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/translations`;
-  const res = await apiFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language }),
-  });
-  if (!res.ok) {
+  try {
+    const res = await apiFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language }),
+    });
+
+    if (res.ok) {
+      return await res.json();
+    }
+
     const errorData = await res.json().catch(() => ({}));
+
+    // If server got rate-limited by datacenter IP block (429) and we have article text,
+    // fallback immediately to client-side direct translation via browser's residential IP!
+    if (res.status === 429 && fallbackArticle?.title) {
+      try {
+        const translatedTitle = await clientTranslateText(fallbackArticle.title);
+        let translatedSummary: string | null = null;
+        if (fallbackArticle.summary) {
+          translatedSummary = await clientTranslateText(fallbackArticle.summary);
+        }
+
+        // Cache back to backend database so future loads are instant
+        const cacheRes = await apiFetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            language,
+            translated_title: translatedTitle,
+            translated_summary: translatedSummary,
+            provider: "mymemory_client",
+            detected_source_language: "EN",
+          }),
+        }).catch(() => null);
+
+        if (cacheRes && cacheRes.ok) {
+          return await cacheRes.json();
+        }
+
+        return {
+          id: articleId,
+          article_id: articleId,
+          language,
+          translated_title: translatedTitle,
+          translated_summary: translatedSummary,
+          translated_content: null,
+          provider: "mymemory_client",
+          detected_source_language: "EN",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+      } catch {
+        // Fall through to error
+      }
+    }
+
     throw new Error(
       errorData.detail ||
         "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original."
     );
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message) {
+      throw err;
+    }
+    throw new Error(
+      "Não foi possível traduzir esta notícia agora. Você ainda pode visualizar o conteúdo original."
+    );
   }
-  return await res.json();
 }

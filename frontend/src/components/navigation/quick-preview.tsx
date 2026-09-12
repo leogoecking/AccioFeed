@@ -94,7 +94,7 @@ export function QuickPreview({
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      const res = await translateArticle(article.id, "pt-BR");
+      const res = await translateArticle(article.id, "pt-BR", article);
       setTranslation(res);
       setActiveLang("pt-BR");
     } catch (err: unknown) {

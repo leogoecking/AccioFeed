@@ -13,6 +13,11 @@ class TranslationRequest(BaseModel):
         max_length=10,
         description="Target language code (e.g. pt-BR)",
     )
+    translated_title: str | None = None
+    translated_summary: str | None = None
+    translated_content: str | None = None
+    provider: str | None = None
+    detected_source_language: str | None = None
 
 
 class ArticleTranslationPublic(BaseModel):

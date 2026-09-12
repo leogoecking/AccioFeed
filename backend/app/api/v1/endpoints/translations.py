@@ -57,6 +57,32 @@ async def translate_article(
     target_lang = payload.language if payload else "pt-BR"
     service = TranslationService(db)
 
+    # If client already translated and is storing directly in database cache
+    if payload and payload.translated_title:
+        from sqlalchemy.exc import IntegrityError
+
+        from app.repositories.translation_repository import TranslationRepository
+
+        repo = TranslationRepository(db)
+        norm_lang = service._normalize_language(target_lang)
+        try:
+            translation = await repo.create_translation(
+                article_id=id,
+                language=norm_lang,
+                translated_title=payload.translated_title,
+                translated_summary=payload.translated_summary,
+                translated_content=payload.translated_content,
+                provider=payload.provider or "client_direct",
+                detected_source_language=payload.detected_source_language or "EN",
+            )
+            await db.commit()
+            return translation
+        except IntegrityError:
+            await db.rollback()
+            existing = await repo.get_by_article_and_language(id, norm_lang)
+            if existing:
+                return existing
+
     try:
         translation = await service.translate_article(id, target_lang)
         return translation
