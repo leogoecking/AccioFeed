@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,13 +58,20 @@ class Settings(BaseSettings):
 
     # Translation
     TRANSLATION_ENABLED: bool = True
-    TRANSLATION_PROVIDER: str = "mymemory"
+    TRANSLATION_PROVIDER: str = "auto"
     TRANSLATION_API_KEY: str = ""
+    DEEPL_API_KEY: str = ""
     TRANSLATION_TARGET_LANGUAGE: str = "pt-BR"
     TRANSLATION_TIMEOUT_SECONDS: int = 10
     TRANSLATION_DEEPL_API_URL: str = ""
     TRANSLATION_LIBRETRANSLATE_API_URL: str = ""
     TRANSLATION_MYMEMORY_EMAIL: str = "contact@acciofeed.app"
+
+    @model_validator(mode="after")
+    def populate_translation_api_key(self) -> "Settings":
+        if not self.TRANSLATION_API_KEY and self.DEEPL_API_KEY:
+            self.TRANSLATION_API_KEY = self.DEEPL_API_KEY
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

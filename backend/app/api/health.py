@@ -22,4 +22,5 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "version": "0.2.0",
         "translation_provider": provider_name,
+        "has_translation_key": bool(settings.TRANSLATION_API_KEY or settings.DEEPL_API_KEY),
     }

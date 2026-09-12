@@ -29,7 +29,9 @@ class DeepLProvider(BaseTranslationProvider):
         api_url: str | None = None,
         timeout_seconds: int | None = None,
     ):
-        self.api_key = (api_key or settings.TRANSLATION_API_KEY or "").strip()
+        self.api_key = (
+            api_key if api_key is not None else (settings.TRANSLATION_API_KEY or "")
+        ).strip()
         self.timeout_seconds = timeout_seconds or settings.TRANSLATION_TIMEOUT_SECONDS
 
         if api_url:
