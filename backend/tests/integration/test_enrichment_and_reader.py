@@ -214,6 +214,48 @@ async def test_timeline_returns_ptbr_display_fields_by_default(
 
 
 @pytest.mark.asyncio
+async def test_timeline_with_extracted_content_detail_does_not_fail_on_deferred_fields(
+    async_client: AsyncClient,
+    db_session: AsyncSession,
+    sample_english_article: Article,
+):
+    """Articles with extracted ArticleContent must serialize cleanly in timeline despite defer() without MissingGreenlet."""
+    from app.models.article_content import ArticleContent
+
+    content = ArticleContent(
+        article_id=sample_english_article.id,
+        extracted_content="Full extracted article text containing comprehensive details.",
+        extraction_status="success",
+        extraction_method="trafilatura",
+    )
+    db_session.add(content)
+    sample_english_article.content_detail = content
+    sample_english_article.content_level = "full"
+    await db_session.commit()
+
+    # Timeline list endpoint (with deferred extracted_content)
+    resp = await async_client.get("/api/v1/articles")
+    assert resp.status_code == 200
+    data = resp.json()
+    item = next((it for it in data["items"] if it["id"] == str(sample_english_article.id)), None)
+    assert item is not None
+    assert item["content_level"] == "full"
+    assert item["extracted_content"] in (
+        None,
+        "Full extracted article text containing comprehensive details.",
+    )
+
+    # Detail endpoint (loads full extracted_content)
+    detail_resp = await async_client.get(f"/api/v1/articles/{sample_english_article.id}")
+    assert detail_resp.status_code == 200
+    detail_data = detail_resp.json()
+    assert (
+        detail_data["extracted_content"]
+        == "Full extracted article text containing comprehensive details."
+    )
+
+
+@pytest.mark.asyncio
 async def test_reader_full_content_translation_on_demand_and_caching(
     async_client: AsyncClient,
     db_session: AsyncSession,

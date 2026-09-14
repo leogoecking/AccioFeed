@@ -58,8 +58,16 @@ class ArticlePublic(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def extract_latest_metric(cls, data: Any) -> Any:
-        if hasattr(data, "metrics"):
-            metrics_list = getattr(data, "metrics", [])
+        if hasattr(data, "metrics") or (isinstance(data, dict) and "metrics" in data):
+            metrics_list = (
+                (
+                    data.__dict__.get("metrics", [])
+                    if hasattr(data, "__dict__")
+                    else getattr(data, "metrics", [])
+                )
+                if not isinstance(data, dict)
+                else data.get("metrics", [])
+            )
             metric_data = {"score": None, "comments": None}
             if metrics_list and len(metrics_list) > 0:
                 latest = metrics_list[0]
@@ -67,7 +75,13 @@ class ArticlePublic(BaseModel):
                 metric_data["comments"] = getattr(latest, "comments_count", None)
 
             state_obj = (
-                getattr(data, "state", None) if not isinstance(data, dict) else data.get("state")
+                (
+                    data.__dict__.get("state")
+                    if hasattr(data, "__dict__")
+                    else getattr(data, "state", None)
+                )
+                if not isinstance(data, dict)
+                else data.get("state")
             )
             state_data = {
                 "is_read": getattr(state_obj, "is_read", False) if state_obj else False,
@@ -85,7 +99,16 @@ class ArticlePublic(BaseModel):
             raw_summary = getattr(data, "summary", None)
 
             # Check translation to PT-BR
-            translations_list = getattr(data, "translations", []) or []
+            translations_list = (
+                (
+                    data.__dict__.get("translations", [])
+                    if hasattr(data, "__dict__")
+                    else getattr(data, "translations", [])
+                )
+                if not isinstance(data, dict)
+                else data.get("translations", [])
+            )
+            translations_list = translations_list or []
             pt_translation = next(
                 (
                     t
@@ -103,7 +126,10 @@ class ArticlePublic(BaseModel):
                 elif hasattr(pt_translation, "__dict__"):
                     trans_content = pt_translation.__dict__.get("translated_content")
                 else:
-                    trans_content = getattr(pt_translation, "translated_content", None)
+                    try:
+                        trans_content = getattr(pt_translation, "translated_content", None)
+                    except Exception:
+                        trans_content = None
 
             # Detect and ignore bogus untranslated echo records
             if pt_translation and getattr(pt_translation, "provider", None) != "original_pt":
@@ -135,13 +161,23 @@ class ArticlePublic(BaseModel):
                 and (getattr(pt_translation, "translated_title", None) or trans_content)
             )
 
-            # Check extracted content
-            content_detail_obj = getattr(data, "content_detail", None)
-            extracted_cnt = (
-                getattr(content_detail_obj, "extracted_content", None)
-                if content_detail_obj
-                else None
+            # Check extracted content safely without triggering deferred attribute lazy loading
+            content_detail_obj = (
+                data.__dict__.get("content_detail")
+                if hasattr(data, "__dict__")
+                else getattr(data, "content_detail", None)
             )
+            extracted_cnt = None
+            if content_detail_obj:
+                if isinstance(content_detail_obj, dict):
+                    extracted_cnt = content_detail_obj.get("extracted_content")
+                elif hasattr(content_detail_obj, "__dict__"):
+                    extracted_cnt = content_detail_obj.__dict__.get("extracted_content")
+                else:
+                    try:
+                        extracted_cnt = getattr(content_detail_obj, "extracted_content", None)
+                    except Exception:
+                        extracted_cnt = None
             cnt_level = getattr(data, "content_level", "partial")
 
             if isinstance(data, dict):
@@ -185,28 +221,40 @@ class ArticlePublic(BaseModel):
                 "state": state_data,
                 "translations": [
                     {
-                        "id": t.id,
-                        "article_id": t.article_id,
-                        "language": t.language,
-                        "translated_title": t.translated_title,
+                        "id": getattr(t, "id", None) if not isinstance(t, dict) else t.get("id"),
+                        "article_id": getattr(t, "article_id", None)
+                        if not isinstance(t, dict)
+                        else t.get("article_id"),
+                        "language": getattr(t, "language", "")
+                        if not isinstance(t, dict)
+                        else t.get("language", ""),
+                        "translated_title": getattr(t, "translated_title", "")
+                        if not isinstance(t, dict)
+                        else t.get("translated_title", ""),
                         "translated_summary": getattr(t, "__dict__", {}).get("translated_summary")
                         if hasattr(t, "__dict__")
-                        else getattr(t, "translated_summary", None),
+                        else (t.get("translated_summary") if isinstance(t, dict) else None),
                         "translated_content": getattr(t, "__dict__", {}).get("translated_content")
                         if hasattr(t, "__dict__")
-                        else getattr(t, "translated_content", None),
-                        "provider": t.provider,
+                        else (t.get("translated_content") if isinstance(t, dict) else None),
+                        "provider": getattr(t, "provider", "")
+                        if not isinstance(t, dict)
+                        else t.get("provider", ""),
                         "detected_source_language": getattr(t, "__dict__", {}).get(
                             "detected_source_language"
                         )
                         if hasattr(t, "__dict__")
-                        else getattr(t, "detected_source_language", None),
-                        "created_at": t.created_at,
-                        "updated_at": t.updated_at,
+                        else (t.get("detected_source_language") if isinstance(t, dict) else None),
+                        "created_at": getattr(t, "created_at", None)
+                        if not isinstance(t, dict)
+                        else t.get("created_at"),
+                        "updated_at": getattr(t, "updated_at", None)
+                        if not isinstance(t, dict)
+                        else t.get("updated_at"),
                     }
                     if not isinstance(t, dict)
                     else t
-                    for t in (getattr(data, "translations", []) or [])
+                    for t in (translations_list or [])
                 ],
             }
         return data
