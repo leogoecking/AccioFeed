@@ -140,9 +140,25 @@ class MyMemoryProvider(BaseTranslationProvider):
         res_data = data.get("responseData") or {}
         translated = res_data.get("translatedText")
         if translated:
-            return html.unescape(translated)
+            decoded = html.unescape(translated).strip()
+            # If MyMemory returned a quota or warning message in the translated string
+            if "MYMEMORY WARNING" in decoded.upper() or "USAGE LIMIT" in decoded.upper():
+                raise TranslationQuotaError("Cota de tradução diária do MyMemory atingida.")
 
-        return text
+            # If MyMemory returned the exact same text without translating (for multi-word phrases)
+            clean_input = text.strip()
+            if (
+                decoded.lower() == clean_input.lower()
+                and len(clean_input.split()) >= 3
+                and not self.is_text_already_portuguese(clean_input)
+            ):
+                raise TranslationUnavailableError(
+                    "MyMemory retornou o texto original em inglês sem traduzir."
+                )
+
+            return decoded
+
+        raise TranslationUnavailableError("MyMemory não retornou texto traduzido.")
 
     async def translate(
         self,

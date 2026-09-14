@@ -32,7 +32,7 @@ def get_translation_provider() -> BaseTranslationProvider:
         return GoogleTranslateProvider()
 
     if provider_name in ("mymemory", "free"):
-        # Primary MyMemory with automatic Google fallback on 429 quota or connection errors
+        # Primary MyMemory with automatic Google fallback on 429 quota, connection errors or untranslated echoes
         return FallbackTranslationProvider([MyMemoryProvider(), GoogleTranslateProvider()])
 
     if provider_name in ("libretranslate", "libre"):

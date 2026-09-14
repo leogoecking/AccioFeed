@@ -145,10 +145,16 @@ export function ArticleModal({
       }
     });
 
-    // 2. Fetch cached translation or start background translation if full content
+    // 2. Fetch cached translation or start background translation if needed
     fetchArticleTranslation(articleId, "pt-BR").then(async (cached) => {
       if (!isCurrent) return;
-      if (cached) {
+      const rawTitle = (article?.title || "").trim();
+      const isEcho =
+        cached &&
+        cached.translated_title.trim().toLowerCase() === rawTitle.toLowerCase() &&
+        !cached.translated_content;
+
+      if (cached && !isEcho) {
         setTranslation(cached);
         setActiveLang("pt-BR");
 
@@ -171,7 +177,8 @@ export function ArticleModal({
             if (isCurrent) setIsTranslating(false);
           }
         }
-      } else if (!isPt && (article?.translation_available || article?.content_level === "full")) {
+      } else if (!isPt) {
+        // If not natively PT and cached is missing or bogus echo, translate automatically!
         setIsTranslating(true);
         try {
           const res = await translateArticle(
@@ -185,7 +192,7 @@ export function ArticleModal({
             setActiveLang("pt-BR");
           }
         } catch (err: unknown) {
-          console.error("Background translation failed:", err);
+          console.error("Auto translation failed:", err);
         } finally {
           if (isCurrent) setIsTranslating(false);
         }
@@ -271,7 +278,27 @@ export function ArticleModal({
   const fullDateFormatted = formatFullDate(currentArticle.published_at);
 
   const isNativelyPt = (currentArticle.language || "").toLowerCase().startsWith("pt");
+  const rawTitle = (currentArticle.original_title || currentArticle.title || "").trim();
+  const rawSummary = (currentArticle.original_summary || currentArticle.summary || "").trim();
+
   const isTranslated = activeLang === "pt-BR" && !isNativelyPt;
+
+  const hasActualTranslation =
+    Boolean(
+      translation?.translated_title &&
+        translation.translated_title.trim().toLowerCase() !== rawTitle.toLowerCase()
+    ) ||
+    Boolean(
+      translation?.translated_content ||
+        (translation?.translated_summary &&
+          translation.translated_summary.trim().toLowerCase() !== rawSummary.toLowerCase())
+    ) ||
+    Boolean(
+      currentArticle.display_title &&
+        currentArticle.display_title.trim().toLowerCase() !== rawTitle.toLowerCase()
+    );
+
+  const showTranslatedBadge = isTranslated && hasActualTranslation;
 
   const handleTranslate = async () => {
     if (!currentArticle?.id) return;
@@ -280,27 +307,17 @@ export function ArticleModal({
       return;
     }
 
-    if (translation) {
+    const isEcho =
+      translation &&
+      translation.translated_title.trim().toLowerCase() === rawTitle.toLowerCase() &&
+      !translation.translated_content;
+
+    const needsFullContent =
+      currentArticle.content_level === "full" &&
+      Boolean(translation && !translation.translated_content);
+
+    if (translation && !isEcho && !needsFullContent) {
       setActiveLang("pt-BR");
-      if (
-        currentArticle.content_level === "full" &&
-        !translation.translated_content
-      ) {
-        setIsTranslating(true);
-        setTranslationError(null);
-        try {
-          const res = await translateArticle(currentArticle.id, "pt-BR", currentArticle, true);
-          setTranslation(res);
-        } catch (err: unknown) {
-          setTranslationError(
-            err instanceof Error
-              ? err.message
-              : "Não foi possível carregar a tradução completa. O conteúdo original permanece acessível."
-          );
-        } finally {
-          setIsTranslating(false);
-        }
-      }
       return;
     }
 
@@ -319,7 +336,7 @@ export function ArticleModal({
       setTranslationError(
         err instanceof Error
           ? err.message
-          : "Não foi possível traduzir esta notícia agora. O conteúdo original permanece acessível."
+          : "Não foi possível traduzir esta matéria agora. O conteúdo original permanece acessível."
       );
     } finally {
       setIsTranslating(false);
@@ -327,11 +344,15 @@ export function ArticleModal({
   };
 
   const displayTitle =
-    isTranslated && translation?.translated_title
+    isTranslated &&
+    translation?.translated_title &&
+    translation.translated_title.trim().toLowerCase() !== rawTitle.toLowerCase()
       ? translation.translated_title
-      : isTranslated && currentArticle.display_title
+      : isTranslated &&
+          currentArticle.display_title &&
+          currentArticle.display_title.trim().toLowerCase() !== rawTitle.toLowerCase()
         ? currentArticle.display_title
-        : currentArticle.original_title || currentArticle.title;
+        : rawTitle;
 
   const originalBody =
     currentArticle.extracted_content ||
@@ -345,7 +366,10 @@ export function ArticleModal({
       contentBody = translation.translated_content;
     } else if (translation?.translated_summary) {
       contentBody = translation.translated_summary;
-    } else if (currentArticle.display_summary) {
+    } else if (
+      currentArticle.display_summary &&
+      currentArticle.display_summary.trim().toLowerCase() !== rawSummary.toLowerCase()
+    ) {
       contentBody = currentArticle.display_summary;
     }
   }
@@ -536,7 +560,7 @@ export function ArticleModal({
 
               {/* Language Mode Toggle & Badges */}
               <div className="flex items-center gap-2">
-                {isTranslated && (
+                {showTranslatedBadge && (
                   <span
                     className="hidden sm:inline-flex items-center gap-1 rounded-md border border-rose-900/30 bg-rose-950/20 px-2 py-0.5 text-[10px] font-mono text-rose-300"
                     title="Conteúdo traduzido automaticamente para português (Brasil) pelo AccioFeed Pipeline"

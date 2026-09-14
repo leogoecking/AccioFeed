@@ -411,3 +411,37 @@ async def test_fallback_provider_cascades_on_429():
             )
             assert res.translated_title == "Título traduzido pelo Google"
             assert res.provider == "google"
+
+
+@pytest.mark.asyncio
+async def test_mymemory_rejects_untranslated_echo_and_falls_back():
+    from app.translation.fallback import FallbackTranslationProvider
+    from app.translation.google import GoogleTranslateProvider
+    from app.translation.mymemory import MyMemoryProvider
+
+    provider1 = MyMemoryProvider()
+    provider2 = GoogleTranslateProvider()
+    fallback = FallbackTranslationProvider([provider1, provider2])
+
+    raw_text = "Flawed Routers Flood University Server"
+    # MyMemory returns the exact same raw_text (echo)
+    mymemory_echo_resp = httpx.Response(
+        status_code=200,
+        json={"responseData": {"translatedText": raw_text}},
+        request=httpx.Request("GET", provider1.api_url),
+    )
+    google_success_resp = httpx.Response(
+        status_code=200,
+        json=[["Roteadores Defeituosos Inundam Servidor", "en"]],
+        request=httpx.Request("GET", provider2.api_url),
+    )
+
+    async def mock_get(_self, url, **_kwargs):
+        if "mymemory" in str(url):
+            return mymemory_echo_resp
+        return google_success_resp
+
+    with patch("httpx.AsyncClient.get", new=mock_get):
+        res = await fallback.translate(raw_text, "pt-BR")
+        assert res.text == "Roteadores Defeituosos Inundam Servidor"
+        assert res.provider == "google"

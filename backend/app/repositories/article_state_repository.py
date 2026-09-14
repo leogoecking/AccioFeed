@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.article import Article
@@ -20,10 +21,16 @@ class ArticleStateRepository:
     async def get_or_create(self, article_id: uuid.UUID) -> ArticleState:
         state = await self.get_by_article_id(article_id)
         if not state:
-            state = ArticleState(article_id=article_id)
-            self.db.add(state)
-            await self.db.commit()
-            await self.db.refresh(state)
+            try:
+                state = ArticleState(article_id=article_id)
+                self.db.add(state)
+                await self.db.commit()
+                await self.db.refresh(state)
+            except IntegrityError:
+                await self.db.rollback()
+                state = await self.get_by_article_id(article_id)
+                if not state:
+                    raise
         return state
 
     async def update_state(

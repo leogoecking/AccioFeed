@@ -55,7 +55,22 @@ class TranslationService:
     ) -> ArticleTranslation | None:
         """Fetch cached translation if it exists."""
         norm_lang = self._normalize_language(language)
-        return await self.repo.get_by_article_and_language(article_id, norm_lang)
+        cached = await self.repo.get_by_article_and_language(article_id, norm_lang)
+        if not cached:
+            return None
+
+        # If this is a bogus untranslated echo record, do not return it as a valid translation
+        if cached.provider != "original_pt":
+            article = await self.article_repo.get_by_id(article_id)
+            if article and not (article.language and article.language.lower().startswith("pt")):
+                if not BaseTranslationProvider.is_text_already_portuguese(article.title):
+                    if (
+                        cached.translated_title.strip().lower() == article.title.strip().lower()
+                        and not cached.translated_content
+                        and len(article.title.split()) >= 3
+                    ):
+                        return None
+        return cached
 
     async def translate_article(
         self,
@@ -90,40 +105,87 @@ class TranslationService:
             # 2. Check cache under lock
             cached = await self.repo.get_by_article_and_language(article_id, norm_lang)
             if cached:
-                # If force_full is not requested, or cache already has full content, or article has no content:
-                if not force_full or cached.translated_content or not effective_content:
-                    logger.debug("Translation cache hit for article %s (%s)", article_id, norm_lang)
-                    return cached
+                is_pt_source = bool(
+                    article.language and article.language.lower() in ("pt", "pt-br", "pt_br", "por")
+                ) or BaseTranslationProvider.is_text_already_portuguese(article.title)
 
-                # If cached record only had title/summary translated, complete it now with full content!
-                provider = get_translation_provider()
-                logger.info(
-                    "Completing on-demand full content translation for article %s via %s",
-                    article_id,
-                    provider.provider_name,
+                is_bogus_echo = (
+                    not is_pt_source
+                    and cached.provider != "original_pt"
+                    and cached.translated_title.strip().lower() == article.title.strip().lower()
+                    and len(article.title.split()) >= 3
                 )
-                try:
-                    result = await provider.translate_article(
-                        title=article.title,
-                        summary=article.summary,
-                        content=effective_content,
-                        target_language=norm_lang,
-                        source_language=article.language if article.language != "en" else None,
-                    )
-                    updated = await self.repo.update_translation_content(
-                        translation_id=cached.id,
-                        translated_content=result.translated_content or "",
-                        provider=result.provider,
-                    )
-                    await self.session.commit()
-                    return updated or cached
-                except Exception as exc:
-                    logger.warning(
-                        "Full content translation failed for article %s: %s",
+
+                if is_bogus_echo:
+                    logger.info(
+                        "Cached translation for article %s is an untranslated echo (%s). Re-translating via active provider.",
                         article_id,
-                        exc,
+                        cached.provider,
                     )
-                    return cached
+                    provider = get_translation_provider()
+                    try:
+                        result = await provider.translate_article(
+                            title=article.title,
+                            summary=article.summary,
+                            content=effective_content
+                            if (force_full or cached.translated_content)
+                            else None,
+                            target_language=norm_lang,
+                            source_language=article.language if article.language != "en" else None,
+                        )
+                        cached.translated_title = result.translated_title
+                        cached.translated_summary = result.translated_summary
+                        if result.translated_content:
+                            cached.translated_content = result.translated_content
+                        cached.provider = result.provider
+                        cached.detected_source_language = result.detected_source_language
+                        await self.session.commit()
+                        await self.session.refresh(cached)
+                        return cached
+                    except Exception as exc:
+                        logger.warning(
+                            "Auto-heal translation failed for article %s: %s",
+                            article_id,
+                            exc,
+                        )
+                        # Continue to see if we can fulfill the request
+                else:
+                    # If force_full is not requested, or cache already has full content, or article has no content:
+                    if not force_full or cached.translated_content or not effective_content:
+                        logger.debug(
+                            "Translation cache hit for article %s (%s)", article_id, norm_lang
+                        )
+                        return cached
+
+                    # If cached record only had title/summary translated, complete it now with full content!
+                    provider = get_translation_provider()
+                    logger.info(
+                        "Completing on-demand full content translation for article %s via %s",
+                        article_id,
+                        provider.provider_name,
+                    )
+                    try:
+                        result = await provider.translate_article(
+                            title=article.title,
+                            summary=article.summary,
+                            content=effective_content,
+                            target_language=norm_lang,
+                            source_language=article.language if article.language != "en" else None,
+                        )
+                        updated = await self.repo.update_translation_content(
+                            translation_id=cached.id,
+                            translated_content=result.translated_content or "",
+                            provider=result.provider,
+                        )
+                        await self.session.commit()
+                        return updated or cached
+                    except Exception as exc:
+                        logger.warning(
+                            "Full content translation failed for article %s: %s",
+                            article_id,
+                            exc,
+                        )
+                        return cached
 
             # 3. Check if article is already in Portuguese
             is_pt_lang = bool(

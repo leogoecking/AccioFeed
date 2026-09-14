@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas.article_state import ArticleStatePublic
 from app.schemas.metric import MetricSummary
 from app.schemas.source import SourcePublic, SourceSimple
+from app.schemas.translation import ArticleTranslationPublic
+from app.translation.base import BaseTranslationProvider
 
 
 class ArticleBase(BaseModel):
@@ -93,6 +95,21 @@ class ArticlePublic(BaseModel):
                 None,
             )
 
+            # Detect and ignore bogus untranslated echo records
+            if pt_translation and getattr(pt_translation, "provider", None) != "original_pt":
+                is_pt_source = bool(
+                    getattr(data, "language", "en") in ("pt", "pt-br", "pt_br", "por")
+                    or BaseTranslationProvider.is_text_already_portuguese(raw_title)
+                )
+                trans_title = getattr(pt_translation, "translated_title", "") or ""
+                if (
+                    not is_pt_source
+                    and trans_title.strip().lower() == raw_title.strip().lower()
+                    and not getattr(pt_translation, "translated_content", None)
+                    and len(raw_title.split()) >= 3
+                ):
+                    pt_translation = None
+
             disp_title = (
                 getattr(pt_translation, "translated_title", None)
                 if pt_translation and getattr(pt_translation, "translated_title", None)
@@ -159,7 +176,10 @@ class ArticlePublic(BaseModel):
                 "updated_at": getattr(data, "updated_at", None),
                 "metrics": metric_data,
                 "state": state_data,
-                "translations": getattr(data, "translations", []),
+                "translations": [
+                    ArticleTranslationPublic.model_validate(t)
+                    for t in (getattr(data, "translations", []) or [])
+                ],
             }
         return data
 
@@ -169,4 +189,4 @@ class ArticleDetail(ArticlePublic):
     collected_at: datetime
     created_at: datetime
     updated_at: datetime
-    translations: list[Any] = Field(default_factory=list)
+    translations: list[ArticleTranslationPublic] = Field(default_factory=list)
