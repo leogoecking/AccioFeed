@@ -95,6 +95,16 @@ class ArticlePublic(BaseModel):
                 None,
             )
 
+            # Safely check translated_content from instance dict without triggering deferred lazy load
+            trans_content = None
+            if pt_translation:
+                if isinstance(pt_translation, dict):
+                    trans_content = pt_translation.get("translated_content")
+                elif hasattr(pt_translation, "__dict__"):
+                    trans_content = pt_translation.__dict__.get("translated_content")
+                else:
+                    trans_content = getattr(pt_translation, "translated_content", None)
+
             # Detect and ignore bogus untranslated echo records
             if pt_translation and getattr(pt_translation, "provider", None) != "original_pt":
                 is_pt_source = bool(
@@ -105,7 +115,7 @@ class ArticlePublic(BaseModel):
                 if (
                     not is_pt_source
                     and trans_title.strip().lower() == raw_title.strip().lower()
-                    and not getattr(pt_translation, "translated_content", None)
+                    and not trans_content
                     and len(raw_title.split()) >= 3
                 ):
                     pt_translation = None
@@ -122,10 +132,7 @@ class ArticlePublic(BaseModel):
             )
             trans_avail = bool(
                 pt_translation
-                and (
-                    getattr(pt_translation, "translated_title", None)
-                    or getattr(pt_translation, "translated_content", None)
-                )
+                and (getattr(pt_translation, "translated_title", None) or trans_content)
             )
 
             # Check extracted content
@@ -177,7 +184,28 @@ class ArticlePublic(BaseModel):
                 "metrics": metric_data,
                 "state": state_data,
                 "translations": [
-                    ArticleTranslationPublic.model_validate(t)
+                    {
+                        "id": t.id,
+                        "article_id": t.article_id,
+                        "language": t.language,
+                        "translated_title": t.translated_title,
+                        "translated_summary": getattr(t, "__dict__", {}).get("translated_summary")
+                        if hasattr(t, "__dict__")
+                        else getattr(t, "translated_summary", None),
+                        "translated_content": getattr(t, "__dict__", {}).get("translated_content")
+                        if hasattr(t, "__dict__")
+                        else getattr(t, "translated_content", None),
+                        "provider": t.provider,
+                        "detected_source_language": getattr(t, "__dict__", {}).get(
+                            "detected_source_language"
+                        )
+                        if hasattr(t, "__dict__")
+                        else getattr(t, "detected_source_language", None),
+                        "created_at": t.created_at,
+                        "updated_at": t.updated_at,
+                    }
+                    if not isinstance(t, dict)
+                    else t
                     for t in (getattr(data, "translations", []) or [])
                 ],
             }
