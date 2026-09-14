@@ -71,6 +71,17 @@ class IngestionScheduler:
         logger.info(
             f"sync_completed sources={len(sources)} success={success_count} failed={fail_count} new_articles={new_count}"
         )
+
+        # Enrich pending articles if any
+        try:
+            async with async_session_factory() as session:
+                from app.services.enrichment_service import ArticleEnrichmentService
+
+                enrichment = ArticleEnrichmentService(session, http_client=shared_client)
+                await enrichment.enrich_pending(limit=20)
+        except Exception as enrich_err:
+            logger.warning("Pending enrichment cycle error: %s", enrich_err)
+
         return results
 
     async def start(self, run_once: bool = False, force: bool = False):

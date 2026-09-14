@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer, selectinload
 
 from app.models.article import Article
+from app.models.article_content import ArticleContent
 from app.models.article_metric import ArticleMetric
 from app.models.article_state import ArticleState
+from app.models.article_translation import ArticleTranslation
 from app.models.source import Source
 
 
@@ -23,6 +25,8 @@ class ArticleRepository:
                 selectinload(Article.source),
                 selectinload(Article.metrics),
                 selectinload(Article.state),
+                selectinload(Article.translations),
+                selectinload(Article.content_detail),
             )
         )
         result = await self.db.execute(stmt)
@@ -157,6 +161,12 @@ class ArticleRepository:
                         Article.summary.ilike(search_pattern),
                         Article.author.ilike(search_pattern),
                         Article.category.ilike(search_pattern),
+                        Article.translations.any(
+                            or_(
+                                ArticleTranslation.translated_title.ilike(search_pattern),
+                                ArticleTranslation.translated_summary.ilike(search_pattern),
+                            )
+                        ),
                     )
                 )
         if from_date:
@@ -223,6 +233,8 @@ class ArticleRepository:
             selectinload(Article.source),
             selectinload(Article.metrics),
             selectinload(Article.state),
+            selectinload(Article.translations).defer(ArticleTranslation.translated_content),
+            selectinload(Article.content_detail).defer(ArticleContent.extracted_content),
         )
         stmt = self._build_filter_stmt(
             stmt,

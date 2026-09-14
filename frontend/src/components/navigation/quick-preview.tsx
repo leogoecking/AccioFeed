@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   AlertCircle,
   Bookmark,
+  BookOpen,
   CheckCircle2,
   Circle,
   ExternalLink,
@@ -58,17 +59,23 @@ export function QuickPreview({
 
   useEffect(() => {
     setImageError(false);
+    const isPt = (article?.language || "").toLowerCase().startsWith("pt");
+    const shouldDefaultPt = isPt || Boolean(article?.translation_available);
+
     setTranslation(null);
-    setActiveLang("original");
+    setActiveLang(shouldDefaultPt ? "pt-BR" : "original");
     setIsTranslating(false);
     setTranslationError(null);
 
     if (article?.id) {
       fetchArticleTranslation(article.id, "pt-BR").then((cached) => {
-        if (cached) setTranslation(cached);
+        if (cached) {
+          setTranslation(cached);
+          setActiveLang("pt-BR");
+        }
       });
     }
-  }, [article?.id]);
+  }, [article?.id, article?.language, article?.translation_available]);
 
   if (!article) return null;
 
@@ -84,8 +91,16 @@ export function QuickPreview({
   const timeFormatted = formatRelativeTime(article.published_at);
   const fullDateFormatted = formatFullDate(article.published_at);
 
+  const isNativelyPt = (article.language || "").toLowerCase().startsWith("pt");
+  const isTranslated = activeLang === "pt-BR" && !isNativelyPt;
+
   const handleTranslate = async () => {
     if (!article?.id) return;
+    if (isNativelyPt) {
+      setActiveLang("pt-BR");
+      return;
+    }
+
     if (translation) {
       setActiveLang("pt-BR");
       return;
@@ -108,13 +123,27 @@ export function QuickPreview({
     }
   };
 
-  const isTranslated = activeLang === "pt-BR" && Boolean(translation);
-  const displayTitle = isTranslated && translation?.translated_title
-    ? translation.translated_title
-    : article.title;
-  const contentBody = isTranslated && (translation?.translated_content || translation?.translated_summary)
-    ? (translation.translated_content || translation.translated_summary)
-    : (article.summary || article.content);
+  const displayTitle =
+    isTranslated && translation?.translated_title
+      ? translation.translated_title
+      : isTranslated && article.display_title
+        ? article.display_title
+        : article.original_title || article.title;
+
+  const originalBody =
+    article.extracted_content || article.content || article.original_summary || article.summary;
+
+  let contentBody = originalBody;
+  if (isTranslated) {
+    if (translation?.translated_content) {
+      contentBody = translation.translated_content;
+    } else if (translation?.translated_summary) {
+      contentBody = translation.translated_summary;
+    } else if (article.display_summary) {
+      contentBody = article.display_summary;
+    }
+  }
+
   const readingTime = estimateReadingTime(contentBody);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
@@ -200,6 +229,16 @@ export function QuickPreview({
               <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
                 {categoryMeta.label}
               </span>
+              {article.content_level === "full" ? (
+                <span className="inline-flex items-center gap-1 rounded border border-emerald-800/40 bg-emerald-950/20 px-1.5 py-0.5 font-medium text-[11px] text-emerald-400">
+                  <BookOpen className="h-3 w-3" />
+                  <span>Leitura completa</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 font-mono text-[11px] text-zinc-400">
+                  <span>Prévia</span>
+                </span>
+              )}
               {readingTime && (
                 <span className="font-mono text-[11px] text-zinc-500 hidden sm:inline">
                   {readingTime}
@@ -301,6 +340,13 @@ export function QuickPreview({
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
+            </div>
+          )}
+
+          {/* Partial Content Notice */}
+          {article.content_level !== "full" && (
+            <div className="rounded-lg border border-amber-900/30 bg-amber-950/20 p-2.5 text-xs text-amber-300">
+              <span className="font-semibold text-amber-200">Prévia da publicação:</span> O conteúdo completo está disponível na fonte original.
             </div>
           )}
 

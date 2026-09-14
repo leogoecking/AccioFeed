@@ -84,7 +84,8 @@ async def translate_article(
                 return existing
 
     try:
-        translation = await service.translate_article(id, target_lang)
+        force_full = payload.force_full if payload else False
+        translation = await service.translate_article(id, target_lang, force_full=force_full)
         return translation
     except ValueError as val_err:
         raise HTTPException(

@@ -59,18 +59,35 @@ class CollectorService:
 
             created_count = 0
             updated_count = 0
+            created_article_ids: list[Any] = []
 
             for raw in raw_items:
                 normalized = provider.normalize(raw)
                 if normalized and provider.validate(normalized):
-                    _, created = await self.article_service.ingest_normalized_article(
+                    art, created = await self.article_service.ingest_normalized_article(
                         source_id=source.id,
                         normalized=normalized,
                     )
                     if created:
                         created_count += 1
+                        created_article_ids.append(art.id)
                     else:
                         updated_count += 1
+
+            # Enrich newly ingested articles (full-text extraction + timeline translation)
+            if created_article_ids:
+                from app.services.enrichment_service import ArticleEnrichmentService
+
+                enrichment_service = ArticleEnrichmentService(self.db, http_client=http_client)
+                for art_id in created_article_ids:
+                    try:
+                        await enrichment_service.enrich_article(art_id)
+                    except Exception as enrich_exc:
+                        logger.warning(
+                            "enrichment_error article_id=%s reason=%s",
+                            art_id,
+                            enrich_exc,
+                        )
 
             duration_s = time.monotonic() - start_time
             duration_ms = int(duration_s * 1000)

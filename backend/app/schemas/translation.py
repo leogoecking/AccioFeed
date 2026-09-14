@@ -13,6 +13,10 @@ class TranslationRequest(BaseModel):
         max_length=10,
         description="Target language code (e.g. pt-BR)",
     )
+    force_full: bool = Field(
+        default=False,
+        description="Whether to force full-text translation if only title/summary was cached",
+    )
     translated_title: str | None = None
     translated_summary: str | None = None
     translated_content: str | None = None

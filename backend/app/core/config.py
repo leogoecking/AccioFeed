@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     HN_MAX_STORIES: int = 30
     HTTP_REQUEST_TIMEOUT: int = 15
 
+    # Full-text Extraction & Enrichment
+    FULLTEXT_EXTRACTION_ENABLED: bool = True
+    EXTRACTION_TIMEOUT_SECONDS: int = 10
+    EXTRACTION_MAX_BYTES: int = 3 * 1024 * 1024
+    MAX_EXTRACTION_CONCURRENCY: int = 2
+
     # Translation
     TRANSLATION_ENABLED: bool = True
     TRANSLATION_PROVIDER: str = "auto"

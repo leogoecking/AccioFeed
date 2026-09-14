@@ -395,14 +395,15 @@ async function clientTranslateText(text: string, langpair: string = "en|pt-BR"):
 export async function translateArticle(
   articleId: string,
   language: string = "pt-BR",
-  fallbackArticle?: { title: string; summary?: string | null; content?: string | null }
+  fallbackArticle?: { title: string; summary?: string | null; content?: string | null },
+  forceFull: boolean = false
 ): Promise<ArticleTranslationPublic> {
   const url = `${API_BASE}/api/v1/articles/${articleId}/translations`;
   try {
     const res = await apiFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language }),
+      body: JSON.stringify({ language, force_full: forceFull }),
     });
 
     if (res.ok) {

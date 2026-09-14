@@ -230,6 +230,20 @@ O **AccioFeed** é um agregador inteligente e self-hosted de notícias e discuss
 - **Justificativa**: Zero desperdício de cota com notícias não lidas. O texto original permanece 100% legível enquanto a tradução ocorre em segundo plano. Uma vez traduzido, o artigo é servido instantaneamente do cache local sem novas requisições externas. Falhas no provedor não impedem o acesso ao artigo original.
 - **Consequência**: Experiência fluida, confiável, econômica e sem scraping invasivo de sites de terceiros.
 
+### ADR 14: Extração Segura de Artigo Completo (Trafilatura) e Pipeline de Enriquecimento PT-BR
+- **Problema**: Muitas fontes internacionais publicam em inglês e seus feeds RSS/Atom fornecem apenas metadados curtos ou resumos truncados. Para que o usuário do AccioFeed encontre o conteúdo preparado para leitura fluida em Português do Brasil (PT-BR) de forma rápida e segura, o sistema precisa extrair o texto principal das matérias sem violar paywalls ou termos de serviço, detectar o idioma, traduzir títulos e resumos previamente no momento da coleta e disponibilizar a tradução completa do corpo sob demanda com cache persistente.
+- **Alternativas**:
+  1. Usar navegadores headless (Playwright/Puppeteer) e rotação de proxies para contornar proteções antibot e paywalls.
+  2. Forçar a tradução completa de todos os textos na thread síncrona da API no momento em que o usuário requisita a timeline.
+  3. Pipeline assíncrono de enriquecimento (`ArticleEnrichmentService`) com Trafilatura, proteção SSRF hop-by-hop, modelo desacoplado (`ArticleContent`), classificação determinística de completude (`content_level`: `FULL`, `PARTIAL`, `METADATA_ONLY`), pré-tradução de metadados na ingestão e tradução completa sob demanda no Reader com cache permanente.
+- **Escolha**: Pipeline assíncrono de enriquecimento desacoplado com Trafilatura, validação SSRF estrita a cada redirect, modelo relacional separado, `content_level` explícito e pré-tradução de metadados.
+- **Justificativa**:
+  - **Segurança e Respeito a Termos**: Não contorna paywalls, autenticação, captchas ou bot cloaking. Identifica-se com User-Agent editorial não-enganoso (`AccioFeed/1.0 (+https://github.com/leogoecking/AccioFeed; Editorial Reader)`). Protege contra SSRF revalidando o IP em cada salto de redirect (máximo 3 hops), bloqueia IPs privados RFC 1918 e metadados cloud (`169.254.169.254`), limita payloads a 3MB e impõe timeout de 10s.
+  - **Desacoplamento e Imutabilidade**: Mantém três representações separadas: `articles.content` (conteúdo bruto do feed), `article_contents.extracted_content` (conteúdo limpo em Markdown extraído via Trafilatura) e `article_translations` (traduções com cache único).
+  - **Desempenho e Experiência do Usuário**: Apenas `title` e `summary` são traduzidos no momento da ingestão. A timeline carrega instantaneamente já em PT-BR. No Reader, se o artigo for `FULL` e estrangeiro, a tradução do corpo completo é disparada sob demanda em background sem bloquear a leitura imediata do texto original.
+  - **Classificação Transparente**: Páginas com paywall ou feeds curtos são categorizadas como `partial` ou `metadata_only`, exibindo um aviso discreto de prévia e botão de destaque para a matéria original.
+- **Consequência**: O AccioFeed entrega uma experiência de leitura limpa em português brasileiro, veloz, resiliente a falhas externas e segura contra vulnerabilidades de rede.
+
 ---
 
 ## 4. Segurança e Resiliência

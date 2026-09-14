@@ -40,6 +40,14 @@ class ArticlePublic(BaseModel):
     image_url: str | None = None
     published_at: datetime
     category: str
+    language: str = "en"
+    content_level: str = "partial"
+    display_title: str
+    display_summary: str | None = None
+    original_title: str
+    original_summary: str | None = None
+    translation_available: bool = False
+    extracted_content: str | None = None
     metrics: MetricSummary = Field(default_factory=MetricSummary)
     state: ArticleStatePublic = Field(default_factory=ArticleStatePublic)
 
@@ -71,19 +79,74 @@ class ArticlePublic(BaseModel):
                 "last_opened_at": getattr(state_obj, "last_opened_at", None) if state_obj else None,
             }
 
+            raw_title = getattr(data, "title", "")
+            raw_summary = getattr(data, "summary", None)
+
+            # Check translation to PT-BR
+            translations_list = getattr(data, "translations", []) or []
+            pt_translation = next(
+                (
+                    t
+                    for t in translations_list
+                    if getattr(t, "language", "").lower() in ("pt", "pt-br", "pt_br")
+                ),
+                None,
+            )
+
+            disp_title = (
+                getattr(pt_translation, "translated_title", None)
+                if pt_translation and getattr(pt_translation, "translated_title", None)
+                else raw_title
+            )
+            disp_summary = (
+                getattr(pt_translation, "translated_summary", None)
+                if pt_translation and getattr(pt_translation, "translated_summary", None)
+                else raw_summary
+            )
+            trans_avail = bool(
+                pt_translation
+                and (
+                    getattr(pt_translation, "translated_title", None)
+                    or getattr(pt_translation, "translated_content", None)
+                )
+            )
+
+            # Check extracted content
+            content_detail_obj = getattr(data, "content_detail", None)
+            extracted_cnt = (
+                getattr(content_detail_obj, "extracted_content", None)
+                if content_detail_obj
+                else None
+            )
+            cnt_level = getattr(data, "content_level", "partial")
+
             if isinstance(data, dict):
                 data["metrics"] = metric_data
                 data["state"] = state_data
+                data.setdefault("display_title", data.get("title", ""))
+                data.setdefault("display_summary", data.get("summary"))
+                data.setdefault("original_title", data.get("title", ""))
+                data.setdefault("original_summary", data.get("summary"))
+                data.setdefault("translation_available", False)
+                data.setdefault("content_level", "partial")
+                data.setdefault("extracted_content", None)
                 return data
 
             return {
                 "id": data.id,
-                "title": data.title,
+                "title": disp_title,
+                "display_title": disp_title,
+                "display_summary": disp_summary,
+                "original_title": raw_title,
+                "original_summary": raw_summary,
+                "translation_available": trans_avail,
+                "content_level": cnt_level,
+                "extracted_content": extracted_cnt,
                 "url": data.url,
                 "canonical_url": getattr(data, "canonical_url", data.url),
                 "source": data.source,
                 "author": getattr(data, "author", None),
-                "summary": getattr(data, "summary", None),
+                "summary": disp_summary,
                 "content": data.__dict__.get("content")
                 if hasattr(data, "__dict__")
                 else getattr(data, "content", None),
@@ -96,6 +159,7 @@ class ArticlePublic(BaseModel):
                 "updated_at": getattr(data, "updated_at", None),
                 "metrics": metric_data,
                 "state": state_data,
+                "translations": getattr(data, "translations", []),
             }
         return data
 
@@ -105,3 +169,4 @@ class ArticleDetail(ArticlePublic):
     collected_at: datetime
     created_at: datetime
     updated_at: datetime
+    translations: list[Any] = Field(default_factory=list)

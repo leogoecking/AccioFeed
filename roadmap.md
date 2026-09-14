@@ -87,13 +87,26 @@ Este roadmap delineia a evolução planejada para o **AccioFeed_**, um agregador
 
 ---
 
-## Fase 7 — Curadoria & Manutenção
+## Fase 7 — Extração Completa Segura & Pipeline Editorial PT-BR (Concluída)
+- [x] **Extração Segura com Trafilatura**: Módulo `ContentExtractor` para extrair texto limpo de notícias sem contornar paywalls, captchas, auth ou Cloudflare.
+- [x] **Defesa em Profundidade contra SSRF**: Revalidação rigorosa de DNS e IP em cada salto de redirect (máximo 3 hops), bloqueio de redes privadas RFC 1918 e metadados cloud, streaming limitado a 3MB e timeout de 10s.
+- [x] **Classificação Determinística de Nível de Conteúdo**: Enum `ContentLevel` (`FULL`, `PARTIAL`, `METADATA_ONLY`) e tabela relacional dedicada `article_contents`.
+- [x] **Desacoplamento de Conteúdo**: Separação estrita entre conteúdo bruto do feed (`articles.content`), conteúdo extraído (`article_contents.extracted_content`) e traduções (`article_translations`).
+- [x] **Pipeline Assíncrono de Enriquecimento**: `ArticleEnrichmentService` com controle de concorrência (`asyncio.Semaphore`), delays de polidez por domínio e execução automática pós-ingestão e no ciclo do worker.
+- [x] **Timeline Nativa em Português**: Pré-tradução de títulos e resumos para `pt-BR` de modo que o leitor já encontre a maior parte do conteúdo pronto na timeline sem requisições adicionais.
+- [x] **Leitor Fluido e Não-Bloqueante**: Reader View e Quick Preview abrem diretamente em `pt-BR`. Artigos completos disparam tradução do corpo completo sob demanda em background sem bloquear a leitura imediata do texto original.
+- [x] **Transparência Editorial e Badges**: Badges visuais "Leitura completa", "Prévia disponível", "Tradução automática" e "Original em português". Aviso discreto para matérias com paywall acompanhado de botão de destaque "Abrir na fonte original ↗".
+- [x] **CLI de Enriquecimento**: Comandos `enrich-pending` e `enrich-article` para execução e manutenção manual.
+
+---
+
+## Fase 8 — Curadoria & Manutenção
 - [ ] Importação e exportação de feeds em formato OPML
 - [ ] Limpeza automática e retenção configurável de artigos antigos (Housekeeping)
 
 ---
 
-## Fase 7 — Performance, Confiabilidade & Self-Hosting
+## Fase 9 — Performance, Confiabilidade & Self-Hosting
 - [ ] Otimização de queries com índices parciais e paginação keyset/cursor-based
 - [ ] Exportação de artigos em Markdown / leitor offline local
 - [ ] Painel de métricas de telemetria operacional da coleta e saúde do sistema

@@ -54,6 +54,13 @@ export interface ArticleTranslationPublic {
 export interface ArticlePublic {
   id: string;
   title: string;
+  display_title?: string;
+  display_summary?: string | null;
+  original_title?: string;
+  original_summary?: string | null;
+  translation_available?: boolean;
+  content_level?: "full" | "partial" | "metadata_only";
+  extracted_content?: string | null;
   url: string;
   canonical_url?: string | null;
   source: SourceSimple;
@@ -63,6 +70,7 @@ export interface ArticlePublic {
   image_url?: string | null;
   published_at: string;
   category: string;
+  language?: string;
   metrics: MetricSummary;
   state: ArticleStatePublic;
 }
@@ -72,6 +80,7 @@ export interface ArticleDetail extends ArticlePublic {
   collected_at: string;
   created_at: string;
   updated_at: string;
+  translations?: ArticleTranslationPublic[];
 }
 
 export interface PaginatedResponse<T> {

@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Bookmark,
+  BookOpen,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -14,6 +15,7 @@ import {
   Languages,
   Loader2,
   Newspaper,
+  Sparkles,
   Star,
   X,
 } from "lucide-react";
@@ -108,14 +110,58 @@ export function ArticleModal({
     setReadingProgress(0);
 
     // Reset translation state for new article and look for cached translation
+    const isPt = (article?.language || "").toLowerCase().startsWith("pt");
+    const shouldDefaultPt = isPt || Boolean(article?.translation_available);
+
     setTranslation(null);
-    setActiveLang("original");
+    setActiveLang(shouldDefaultPt ? "pt-BR" : "original");
     setIsTranslating(false);
     setTranslationError(null);
 
-    fetchArticleTranslation(articleId, "pt-BR").then((cached) => {
-      if (isMounted && cached) {
+    fetchArticleTranslation(articleId, "pt-BR").then(async (cached) => {
+      if (!isMounted) return;
+      if (cached) {
         setTranslation(cached);
+        setActiveLang("pt-BR");
+
+        // If full content is extracted but translation only has title/summary, fetch full translation on-demand
+        const needsFullTranslation =
+          !isPt &&
+          article.content_level === "full" &&
+          !cached.translated_content &&
+          Boolean(article.extracted_content || article.content);
+
+        if (needsFullTranslation) {
+          setIsTranslating(true);
+          try {
+            const fullRes = await translateArticle(articleId, "pt-BR", article, true);
+            if (isMounted) {
+              setTranslation(fullRes);
+            }
+          } catch (e: unknown) {
+            console.error("Full translation error:", e);
+          } finally {
+            if (isMounted) setIsTranslating(false);
+          }
+        }
+      } else if (!isPt && article.translation_available) {
+        setIsTranslating(true);
+        try {
+          const res = await translateArticle(
+            articleId,
+            "pt-BR",
+            article,
+            article.content_level === "full"
+          );
+          if (isMounted) {
+            setTranslation(res);
+            setActiveLang("pt-BR");
+          }
+        } catch (err: unknown) {
+          console.error("Background translation failed:", err);
+        } finally {
+          if (isMounted) setIsTranslating(false);
+        }
       }
     });
 
@@ -135,7 +181,7 @@ export function ArticleModal({
     return () => {
       isMounted = false;
     };
-  }, [articleId]);
+  }, [articleId, article]);
 
   // Sync state changes from parent
   useEffect(() => {
@@ -203,17 +249,50 @@ export function ArticleModal({
   const timeFormatted = formatRelativeTime(article.published_at);
   const fullDateFormatted = formatFullDate(article.published_at);
 
+  const isNativelyPt = (article.language || "").toLowerCase().startsWith("pt");
+  const isTranslated = activeLang === "pt-BR" && !isNativelyPt;
+
   const handleTranslate = async () => {
     if (!article?.id) return;
+    if (isNativelyPt) {
+      setActiveLang("pt-BR");
+      return;
+    }
+
     if (translation) {
       setActiveLang("pt-BR");
+      if (
+        article.content_level === "full" &&
+        !translation.translated_content &&
+        Boolean(article.extracted_content || article.content)
+      ) {
+        setIsTranslating(true);
+        setTranslationError(null);
+        try {
+          const res = await translateArticle(article.id, "pt-BR", article, true);
+          setTranslation(res);
+        } catch (err: unknown) {
+          setTranslationError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar a tradução completa. O conteúdo original permanece acessível."
+          );
+        } finally {
+          setIsTranslating(false);
+        }
+      }
       return;
     }
 
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      const res = await translateArticle(article.id, "pt-BR", article);
+      const res = await translateArticle(
+        article.id,
+        "pt-BR",
+        article,
+        article.content_level === "full"
+      );
       setTranslation(res);
       setActiveLang("pt-BR");
     } catch (err: unknown) {
@@ -227,14 +306,27 @@ export function ArticleModal({
     }
   };
 
-  const isTranslated = activeLang === "pt-BR" && Boolean(translation);
-  const displayTitle = isTranslated && translation?.translated_title
-    ? translation.translated_title
-    : article.title;
-  const rawBody = isTranslated && (translation?.translated_content || translation?.translated_summary)
-    ? (translation.translated_content || translation.translated_summary)
-    : (article.content || article.summary);
-  const contentBody = rawBody;
+  const displayTitle =
+    isTranslated && translation?.translated_title
+      ? translation.translated_title
+      : isTranslated && article.display_title
+        ? article.display_title
+        : article.original_title || article.title;
+
+  const originalBody =
+    article.extracted_content || article.content || article.original_summary || article.summary;
+
+  let contentBody = originalBody;
+  if (isTranslated) {
+    if (translation?.translated_content) {
+      contentBody = translation.translated_content;
+    } else if (translation?.translated_summary) {
+      contentBody = translation.translated_summary;
+    } else if (article.display_summary) {
+      contentBody = article.display_summary;
+    }
+  }
+
   const readingTime = estimateReadingTime(contentBody);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
@@ -351,60 +443,77 @@ export function ArticleModal({
                 <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
                   {categoryMeta.label}
                 </span>
+                {article.content_level === "full" ? (
+                  <span className="inline-flex items-center gap-1 rounded border border-emerald-800/40 bg-emerald-950/20 px-2 py-0.5 font-medium text-xs text-emerald-400">
+                    <BookOpen className="h-3 w-3" />
+                    <span>Leitura completa</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 font-mono text-xs text-zinc-400">
+                    <span>Prévia</span>
+                  </span>
+                )}
               </div>
 
-              {/* Language Mode Toggle (Milestones 4-6) */}
+              {/* Language Mode Toggle & Badges */}
               <div className="flex items-center gap-2">
-                {isTranslated && translation && (
-                  <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-rose-900/30 bg-rose-950/20 px-2 py-0.5 text-[10px] font-mono text-rose-300">
-                    <Languages className="h-3 w-3 text-rose-400" />
-                    <span>
-                      {translation.provider === "original_pt"
-                        ? "Original em português"
-                        : `Traduzido (${translation.provider.toUpperCase()})`}
-                    </span>
+                {isTranslated && (
+                  <span
+                    className="hidden sm:inline-flex items-center gap-1 rounded-md border border-rose-900/30 bg-rose-950/20 px-2 py-0.5 text-[10px] font-mono text-rose-300"
+                    title="Conteúdo traduzido automaticamente para português (Brasil) pelo AccioFeed Pipeline"
+                  >
+                    <Sparkles className="h-3 w-3 text-rose-400" />
+                    <span>Tradução automática</span>
                   </span>
                 )}
 
-                <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setActiveLang("original")}
-                    className={cn(
-                      "rounded px-2.5 py-1 font-medium transition-colors",
-                      activeLang === "original"
-                        ? "bg-zinc-800 text-zinc-100 shadow-xs"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    )}
-                  >
-                    Original
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTranslate}
-                    disabled={isTranslating}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors",
-                      activeLang === "pt-BR"
-                        ? "bg-rose-600 text-white shadow-xs font-semibold"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
-                      isTranslating && "opacity-80"
-                    )}
-                    title="Traduzir notícia para português (Brasil)"
-                  >
-                    {isTranslating ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin text-rose-300" />
-                        <span>Traduzindo...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Languages className="h-3 w-3" />
-                        <span>PT-BR</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                {isNativelyPt && (
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-md border border-emerald-900/30 bg-emerald-950/20 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
+                    <span>Original em português</span>
+                  </span>
+                )}
+
+                {!isNativelyPt && (
+                  <div className="inline-flex items-center rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setActiveLang("original")}
+                      className={cn(
+                        "rounded px-2.5 py-1 font-medium transition-colors",
+                        activeLang === "original"
+                          ? "bg-zinc-800 text-zinc-100 shadow-xs"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      )}
+                    >
+                      Original
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTranslate}
+                      disabled={isTranslating}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded px-2.5 py-1 font-medium transition-colors",
+                        activeLang === "pt-BR"
+                          ? "bg-rose-600 text-white shadow-xs font-semibold"
+                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
+                        isTranslating && "opacity-80"
+                      )}
+                      title="Alternar para leitura em português do Brasil"
+                    >
+                      {isTranslating ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin text-rose-300" />
+                          <span>Traduzindo...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Languages className="h-3 w-3" />
+                          <span>Português</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -529,6 +638,42 @@ export function ArticleModal({
                   className="w-full max-h-96 object-cover"
                   loading="lazy"
                 />
+              </div>
+            )}
+
+            {/* In-Progress Full Translation Notice (Non-blocking) */}
+            {isTranslating && (
+              <div className="flex items-center gap-2.5 rounded-xl border border-rose-900/30 bg-rose-950/20 px-3.5 py-2.5 text-xs text-rose-300 animate-pulse">
+                <Loader2 className="h-4 w-4 animate-spin text-rose-400 shrink-0" />
+                <span>Traduzindo artigo completo para português... A leitura já está acessível abaixo.</span>
+              </div>
+            )}
+
+            {/* Partial / Restricted Content Notice */}
+            {article.content_level !== "full" && (
+              <div className="rounded-xl border border-amber-900/30 bg-amber-950/15 p-4 sm:p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold text-amber-200">
+                      Prévia disponível
+                    </h4>
+                    <p className="text-xs text-amber-300/80 leading-relaxed">
+                      O conteúdo completo está disponível na publicação original. Esta fonte publica apenas resumo via feed ou requer acesso ao portal original.
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-1 flex">
+                  <a
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 px-3.5 py-1.5 text-xs font-semibold text-amber-200 transition-colors"
+                  >
+                    <span>Abrir na fonte original</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
               </div>
             )}
 

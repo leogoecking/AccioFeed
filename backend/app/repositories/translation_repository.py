@@ -63,3 +63,21 @@ class TranslationRepository:
         await self.session.flush()
         await self.session.refresh(translation)
         return translation
+
+    async def update_translation_content(
+        self,
+        translation_id: UUID,
+        translated_content: str,
+        provider: str | None = None,
+    ) -> ArticleTranslation | None:
+        """Update the translated full-text content of an existing translation record."""
+        stmt = select(ArticleTranslation).where(ArticleTranslation.id == translation_id)
+        res = await self.session.execute(stmt)
+        translation = res.scalar_one_or_none()
+        if translation:
+            translation.translated_content = translated_content.strip()
+            if provider:
+                translation.provider = provider
+            await self.session.flush()
+            await self.session.refresh(translation)
+        return translation

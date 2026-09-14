@@ -66,3 +66,45 @@ def extract_image_from_html(raw_html: str | None) -> str | None:
                 continue
             return src.strip()
     return None
+
+
+def sanitize_editorial_content(content: str | None) -> str | None:
+    """Sanitizes editorial content (Markdown or HTML) by decomposing dangerous tags
+
+    and neutralizing javascript:/data: URLs while preserving rich editorial structure.
+    """
+    if not content or not content.strip():
+        return None
+
+    cleaned = content
+
+    # 1. Neutralize javascript: or data: in markdown links [text](javascript:...)
+    cleaned = re.sub(
+        r"\[([^\]]+)\]\((javascript|data):[^\)]*\)",
+        r"[\1](#)",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+
+    # 2. Decompose dangerous HTML tags if HTML fragments are embedded
+    if "<" in cleaned and ">" in cleaned:
+        soup = BeautifulSoup(cleaned, "html.parser")
+        for tag in soup.find_all(DANGEROUS_TAGS):
+            tag.decompose()
+
+        # Remove inline event handlers from all remaining tags
+        for tag in soup.find_all(True):
+            for attr in list(tag.attrs.keys()):
+                if attr.lower().startswith("on") or attr.lower() in ("formaction", "action"):
+                    del tag.attrs[attr]
+                elif attr.lower() in ("href", "src"):
+                    val = str(tag.attrs[attr]).strip().lower()
+                    if val.startswith("javascript:") or val.startswith("data:"):
+                        tag.attrs[attr] = "#"
+
+        cleaned = str(soup)
+
+    # 3. Collapse excessive empty newlines (more than 2 consecutive blank lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+    return cleaned or None

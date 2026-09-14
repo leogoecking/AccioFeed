@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   Bookmark,
+  BookOpen,
   CheckCircle2,
   Circle,
   Eye,
@@ -64,7 +65,9 @@ export function ArticleCard({
   const sourceMeta = getSourceBadge(article.source.slug);
   const timeFormatted = formatRelativeTime(article.published_at);
   const fullDateFormatted = formatFullDate(article.published_at);
-  const readingTime = estimateReadingTime(article.summary || article.content);
+  const cardTitle = article.display_title || article.title;
+  const cardSummary = article.display_summary || article.summary;
+  const readingTime = estimateReadingTime(cardSummary || article.content);
   const hasValidImage = Boolean(article.image_url && !imageError);
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
@@ -154,6 +157,12 @@ export function ArticleCard({
               </span>
               <span>•</span>
               <span className="text-zinc-400">{categoryMeta.label}</span>
+              {article.content_level === "full" && (
+                <span className="hidden sm:inline-flex items-center gap-0.5 rounded bg-emerald-950/50 border border-emerald-800/40 px-1 py-0.2 text-[9px] font-mono text-emerald-400">
+                  <BookOpen className="h-2.5 w-2.5" />
+                  <span>Completo</span>
+                </span>
+              )}
               {readingTime && (
                 <>
                   <span className="hidden sm:inline">•</span>
@@ -170,7 +179,7 @@ export function ArticleCard({
                 state.is_read ? "text-zinc-300 font-normal" : "text-zinc-100 font-semibold"
               )}
             >
-              <HighlightText text={article.title} query={searchQuery} />
+              <HighlightText text={cardTitle} query={searchQuery} />
             </h3>
           </div>
         </div>
@@ -294,6 +303,12 @@ export function ArticleCard({
               <span className={cn("rounded border px-2 py-0.5 font-medium text-[11px]", categoryMeta.className)}>
                 {categoryMeta.label}
               </span>
+              {article.content_level === "full" && (
+                <span className="inline-flex items-center gap-1 rounded border border-emerald-800/40 bg-emerald-950/20 px-1.5 py-0.2 text-[10px] font-medium text-emerald-400">
+                  <BookOpen className="h-3 w-3" />
+                  <span>Leitura completa</span>
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-zinc-500 font-mono text-[11px]" title={fullDateFormatted}>
@@ -383,13 +398,13 @@ export function ArticleCard({
                 : "font-semibold text-zinc-100 group-hover:text-rose-400"
             )}
           >
-            <HighlightText text={article.title} query={searchQuery} />
+            <HighlightText text={cardTitle} query={searchQuery} />
           </h3>
 
           {/* Summary */}
-          {article.summary ? (
+          {cardSummary ? (
             <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
-              <HighlightText text={article.summary} query={searchQuery} />
+              <HighlightText text={cardSummary} query={searchQuery} />
             </p>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-zinc-600 italic">

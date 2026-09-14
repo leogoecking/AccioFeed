@@ -17,6 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, utc_now
 
 if TYPE_CHECKING:
+    from app.models.article_content import ArticleContent
     from app.models.article_metric import ArticleMetric
     from app.models.article_state import ArticleState
     from app.models.article_translation import ArticleTranslation
@@ -56,6 +57,12 @@ class Article(Base, TimestampMixin):
         nullable=False,
     )
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
+    content_level: Mapped[str] = mapped_column(
+        String(20),
+        default="partial",
+        index=True,
+        nullable=False,
+    )
     category: Mapped[str] = mapped_column(
         String(50),
         default="general",
@@ -87,6 +94,13 @@ class Article(Base, TimestampMixin):
         "ArticleTranslation",
         back_populates="article",
         cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    content_detail: Mapped["ArticleContent | None"] = relationship(
+        "ArticleContent",
+        back_populates="article",
+        cascade="all, delete-orphan",
+        uselist=False,
         lazy="selectin",
     )
 
