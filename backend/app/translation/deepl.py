@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.sources.sanitizer import sanitize_text
+from app.sources.sanitizer import sanitize_editorial_content
 from app.translation.base import (
     ArticleTranslationResult,
     BaseTranslationProvider,
@@ -253,7 +253,7 @@ class DeepLProvider(BaseTranslationProvider):
             texts_to_translate.append(summary.strip())
 
         # 3. Handle content: sanitize and limit length for safety and clean markup
-        clean_content = sanitize_text(content, max_length=5000) if content else None
+        clean_content = sanitize_editorial_content(content) if content else None
         has_content = bool(clean_content and clean_content.strip())
         if has_content and clean_content is not None:
             texts_to_translate.append(clean_content.strip())

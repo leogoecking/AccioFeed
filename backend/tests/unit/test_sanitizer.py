@@ -1,4 +1,8 @@
-from app.sources.sanitizer import extract_image_from_html, sanitize_text
+from app.sources.sanitizer import (
+    extract_image_from_html,
+    sanitize_editorial_content,
+    sanitize_text,
+)
 
 
 def test_sanitize_text_strips_scripts_and_iframes():
@@ -24,6 +28,29 @@ def test_sanitize_text_truncates_at_word_boundary():
     assert len(truncated) <= 35
     assert truncated.endswith("...")
     assert not truncated.endswith(" ...")
+
+
+def test_sanitize_editorial_content_preserves_paragraphs():
+    content = "# Title\n\nFirst paragraph with insights.\n\nSecond paragraph with details."
+    cleaned = sanitize_editorial_content(content)
+    assert cleaned == "# Title\n\nFirst paragraph with insights.\n\nSecond paragraph with details."
+
+
+def test_sanitize_editorial_content_neutralizes_xss_and_dangerous_links():
+    dirty = """# Subtitle
+
+First paragraph.
+
+<script>alert('pwned')</script>
+
+Check [malicious link](javascript:alert(1)) or [normal link](https://example.com).
+"""
+    cleaned = sanitize_editorial_content(dirty)
+    assert cleaned is not None
+    assert "alert('pwned')" not in cleaned
+    assert "[malicious link](#)" in cleaned
+    assert "[normal link](https://example.com)" in cleaned
+    assert "First paragraph." in cleaned
 
 
 def test_extract_image_from_html():

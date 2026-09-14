@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.sources.sanitizer import sanitize_text
+from app.sources.sanitizer import sanitize_editorial_content
 from app.translation.base import (
     ArticleTranslationResult,
     BaseTranslationProvider,
@@ -239,7 +239,7 @@ class MyMemoryProvider(BaseTranslationProvider):
             # 3. Translate Content (if present and needed)
             translated_content: str | None = None
             if content and content.strip():
-                clean_content = sanitize_text(content, max_length=4000)
+                clean_content = sanitize_editorial_content(content)
                 if clean_content:
                     chunks = _chunk_text(clean_content)
                     # Limit to first 4 chunks for latency & quota safety

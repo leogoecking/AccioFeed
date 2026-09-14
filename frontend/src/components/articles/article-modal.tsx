@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  ArticleDetail,
   ArticlePublic,
   ArticleStatePublic,
   ArticleTranslationPublic,
@@ -33,6 +34,7 @@ import {
   getSourceBadge,
 } from "@/lib/utils";
 import {
+  fetchArticleById,
   fetchArticleTranslation,
   recordArticleOpened,
   translateArticle,
@@ -68,6 +70,7 @@ export function ArticleModal({
     is_saved: false,
     is_hidden: false,
   });
+  const [fullArticle, setFullArticle] = useState<ArticleDetail | null>(null);
 
   // Translation states (Milestone 4, 5 & 6)
   const [translation, setTranslation] = useState<ArticleTranslationPublic | null>(null);
@@ -105,9 +108,10 @@ export function ArticleModal({
   useEffect(() => {
     if (!articleId) return;
 
-    let isMounted = true;
+    let isCurrent = true;
     setImageError(false);
     setReadingProgress(0);
+    setFullArticle(null);
 
     // Reset translation state for new article and look for cached translation
     const isPt = (article?.language || "").toLowerCase().startsWith("pt");
@@ -118,8 +122,32 @@ export function ArticleModal({
     setIsTranslating(false);
     setTranslationError(null);
 
+    // 1. Fetch full article details and record opening in background
+    recordArticleOpened(articleId).then((opened) => {
+      if (!isCurrent) return;
+      if (opened) {
+        setFullArticle(opened);
+        if (opened.state) {
+          setLocalState(opened.state);
+          onStateChangeRef.current?.(articleId, opened.state);
+        }
+      } else {
+        // Fallback: fetch article by ID directly
+        fetchArticleById(articleId).then((detail) => {
+          if (isCurrent && detail) {
+            setFullArticle(detail);
+            if (detail.state) {
+              setLocalState(detail.state);
+              onStateChangeRef.current?.(articleId, detail.state);
+            }
+          }
+        });
+      }
+    });
+
+    // 2. Fetch cached translation or start background translation if full content
     fetchArticleTranslation(articleId, "pt-BR").then(async (cached) => {
-      if (!isMounted) return;
+      if (!isCurrent) return;
       if (cached) {
         setTranslation(cached);
         setActiveLang("pt-BR");
@@ -127,49 +155,40 @@ export function ArticleModal({
         // If full content is extracted but translation only has title/summary, fetch full translation on-demand
         const needsFullTranslation =
           !isPt &&
-          article.content_level === "full" &&
-          !cached.translated_content &&
-          Boolean(article.extracted_content || article.content);
+          article?.content_level === "full" &&
+          !cached.translated_content;
 
         if (needsFullTranslation) {
           setIsTranslating(true);
           try {
             const fullRes = await translateArticle(articleId, "pt-BR", article, true);
-            if (isMounted) {
+            if (isCurrent) {
               setTranslation(fullRes);
             }
           } catch (e: unknown) {
             console.error("Full translation error:", e);
           } finally {
-            if (isMounted) setIsTranslating(false);
+            if (isCurrent) setIsTranslating(false);
           }
         }
-      } else if (!isPt && article.translation_available) {
+      } else if (!isPt && (article?.translation_available || article?.content_level === "full")) {
         setIsTranslating(true);
         try {
           const res = await translateArticle(
             articleId,
             "pt-BR",
             article,
-            article.content_level === "full"
+            article?.content_level === "full"
           );
-          if (isMounted) {
+          if (isCurrent) {
             setTranslation(res);
             setActiveLang("pt-BR");
           }
         } catch (err: unknown) {
           console.error("Background translation failed:", err);
         } finally {
-          if (isMounted) setIsTranslating(false);
+          if (isCurrent) setIsTranslating(false);
         }
-      }
-    });
-
-    // Automatically record opening in background (marks read, records timestamps)
-    recordArticleOpened(articleId).then((updated) => {
-      if (isMounted && updated?.state) {
-        setLocalState(updated.state);
-        onStateChangeRef.current?.(articleId, updated.state);
       }
     });
 
@@ -179,9 +198,10 @@ export function ArticleModal({
     }
 
     return () => {
-      isMounted = false;
+      isCurrent = false;
     };
-  }, [articleId, article]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when switching articles, not on bookmark/favorite state updates
+  }, [articleId]);
 
   // Sync state changes from parent
   useEffect(() => {
@@ -242,18 +262,19 @@ export function ArticleModal({
     }
   };
 
-  if (!article) return null;
+  const currentArticle = fullArticle || article;
+  if (!currentArticle) return null;
 
-  const categoryMeta = getCategoryBadge(article.category);
-  const sourceMeta = getSourceBadge(article.source.slug);
-  const timeFormatted = formatRelativeTime(article.published_at);
-  const fullDateFormatted = formatFullDate(article.published_at);
+  const categoryMeta = getCategoryBadge(currentArticle.category);
+  const sourceMeta = getSourceBadge(currentArticle.source.slug);
+  const timeFormatted = formatRelativeTime(currentArticle.published_at);
+  const fullDateFormatted = formatFullDate(currentArticle.published_at);
 
-  const isNativelyPt = (article.language || "").toLowerCase().startsWith("pt");
+  const isNativelyPt = (currentArticle.language || "").toLowerCase().startsWith("pt");
   const isTranslated = activeLang === "pt-BR" && !isNativelyPt;
 
   const handleTranslate = async () => {
-    if (!article?.id) return;
+    if (!currentArticle?.id) return;
     if (isNativelyPt) {
       setActiveLang("pt-BR");
       return;
@@ -262,14 +283,13 @@ export function ArticleModal({
     if (translation) {
       setActiveLang("pt-BR");
       if (
-        article.content_level === "full" &&
-        !translation.translated_content &&
-        Boolean(article.extracted_content || article.content)
+        currentArticle.content_level === "full" &&
+        !translation.translated_content
       ) {
         setIsTranslating(true);
         setTranslationError(null);
         try {
-          const res = await translateArticle(article.id, "pt-BR", article, true);
+          const res = await translateArticle(currentArticle.id, "pt-BR", currentArticle, true);
           setTranslation(res);
         } catch (err: unknown) {
           setTranslationError(
@@ -288,10 +308,10 @@ export function ArticleModal({
     setTranslationError(null);
     try {
       const res = await translateArticle(
-        article.id,
+        currentArticle.id,
         "pt-BR",
-        article,
-        article.content_level === "full"
+        currentArticle,
+        currentArticle.content_level === "full"
       );
       setTranslation(res);
       setActiveLang("pt-BR");
@@ -309,12 +329,15 @@ export function ArticleModal({
   const displayTitle =
     isTranslated && translation?.translated_title
       ? translation.translated_title
-      : isTranslated && article.display_title
-        ? article.display_title
-        : article.original_title || article.title;
+      : isTranslated && currentArticle.display_title
+        ? currentArticle.display_title
+        : currentArticle.original_title || currentArticle.title;
 
   const originalBody =
-    article.extracted_content || article.content || article.original_summary || article.summary;
+    currentArticle.extracted_content ||
+    currentArticle.content ||
+    currentArticle.original_summary ||
+    currentArticle.summary;
 
   let contentBody = originalBody;
   if (isTranslated) {
@@ -322,39 +345,95 @@ export function ArticleModal({
       contentBody = translation.translated_content;
     } else if (translation?.translated_summary) {
       contentBody = translation.translated_summary;
-    } else if (article.display_summary) {
-      contentBody = article.display_summary;
+    } else if (currentArticle.display_summary) {
+      contentBody = currentArticle.display_summary;
     }
   }
 
   const readingTime = estimateReadingTime(contentBody);
-  const hasValidImage = Boolean(article.image_url && !imageError);
+  const hasValidImage = Boolean(currentArticle.image_url && !imageError);
 
   const toggleFavorite = async () => {
+    if (!currentArticle) return;
     const nextVal = !localState.is_favorite;
     setLocalState((prev) => ({ ...prev, is_favorite: nextVal }));
-    onStateChange?.(article.id, { is_favorite: nextVal });
-    await updateArticleState(article.id, { is_favorite: nextVal });
+    onStateChange?.(currentArticle.id, { is_favorite: nextVal });
+    await updateArticleState(currentArticle.id, { is_favorite: nextVal });
   };
 
   const toggleSaved = async () => {
+    if (!currentArticle) return;
     const nextVal = !localState.is_saved;
     setLocalState((prev) => ({ ...prev, is_saved: nextVal }));
-    onStateChange?.(article.id, { is_saved: nextVal });
-    await updateArticleState(article.id, { is_saved: nextVal });
+    onStateChange?.(currentArticle.id, { is_saved: nextVal });
+    await updateArticleState(currentArticle.id, { is_saved: nextVal });
   };
 
   const toggleRead = async () => {
+    if (!currentArticle) return;
     const nextVal = !localState.is_read;
     setLocalState((prev) => ({ ...prev, is_read: nextVal }));
-    onStateChange?.(article.id, { is_read: nextVal });
-    await updateArticleState(article.id, { is_read: nextVal });
+    onStateChange?.(currentArticle.id, { is_read: nextVal });
+    await updateArticleState(currentArticle.id, { is_read: nextVal });
   };
 
   const handleHide = async () => {
-    onHide?.(article.id);
+    if (!currentArticle) return;
+    onHide?.(currentArticle.id);
     onClose();
-    await updateArticleState(article.id, { is_hidden: true });
+    await updateArticleState(currentArticle.id, { is_hidden: true });
+  };
+
+  const renderParagraph = (para: string, idx: number) => {
+    const trimmed = para.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith("### ")) {
+      return (
+        <h3 key={idx} className="text-lg font-bold text-zinc-100 pt-3 pb-1 tracking-tight">
+          {trimmed.replace(/^###\s+/, "")}
+        </h3>
+      );
+    }
+    if (trimmed.startsWith("## ")) {
+      return (
+        <h2 key={idx} className="text-xl font-bold text-zinc-100 pt-4 pb-1 tracking-tight">
+          {trimmed.replace(/^##\s+/, "")}
+        </h2>
+      );
+    }
+    if (trimmed.startsWith("# ")) {
+      return (
+        <h2 key={idx} className="text-xl font-bold text-zinc-100 pt-4 pb-1 tracking-tight">
+          {trimmed.replace(/^#\s+/, "")}
+        </h2>
+      );
+    }
+    if (trimmed.startsWith("> ")) {
+      return (
+        <blockquote key={idx} className="border-l-2 border-rose-500/60 pl-4 py-1 italic text-zinc-400 my-2">
+          {trimmed.replace(/^>\s*/, "")}
+        </blockquote>
+      );
+    }
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      const items = trimmed.split("\n").filter((l) => l.trim().startsWith("- ") || l.trim().startsWith("* "));
+      if (items.length > 0) {
+        return (
+          <ul key={idx} className="list-disc list-inside space-y-1.5 text-zinc-300 my-2">
+            {items.map((it, itemIdx) => (
+              <li key={itemIdx}>{it.replace(/^[-*]\s+/, "")}</li>
+            ))}
+          </ul>
+        );
+      }
+    }
+
+    return (
+      <p key={idx} className="leading-relaxed">
+        {trimmed}
+      </p>
+    );
   };
 
   return (
@@ -438,12 +517,12 @@ export function ArticleModal({
             <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400 border-b border-zinc-900 pb-4">
               <div className="flex items-center gap-2">
                 <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", sourceMeta.badgeClass)}>
-                  {article.source.name}
+                  {currentArticle.source.name}
                 </span>
                 <span className={cn("rounded border px-2 py-0.5 font-medium text-xs", categoryMeta.className)}>
                   {categoryMeta.label}
                 </span>
-                {article.content_level === "full" ? (
+                {currentArticle.content_level === "full" ? (
                   <span className="inline-flex items-center gap-1 rounded border border-emerald-800/40 bg-emerald-950/20 px-2 py-0.5 font-medium text-xs text-emerald-400">
                     <BookOpen className="h-3 w-3" />
                     <span>Leitura completa</span>
@@ -551,9 +630,9 @@ export function ArticleModal({
 
             {/* Author, Date & Reading Time */}
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-zinc-400">
-              {article.author && (
+              {currentArticle.author && (
                 <>
-                  <span>Por <strong className="text-zinc-200">{article.author}</strong></span>
+                  <span>Por <strong className="text-zinc-200">{currentArticle.author}</strong></span>
                   <span>•</span>
                 </>
               )}
@@ -632,8 +711,8 @@ export function ArticleModal({
               <div className="overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={article.image_url!}
-                  alt={article.title}
+                  src={currentArticle.image_url!}
+                  alt={currentArticle.title}
                   onError={() => setImageError(true)}
                   className="w-full max-h-96 object-cover"
                   loading="lazy"
@@ -650,7 +729,7 @@ export function ArticleModal({
             )}
 
             {/* Partial / Restricted Content Notice */}
-            {article.content_level !== "full" && (
+            {currentArticle.content_level !== "full" && (
               <div className="rounded-xl border border-amber-900/30 bg-amber-950/15 p-4 sm:p-5 space-y-3">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
@@ -665,7 +744,7 @@ export function ArticleModal({
                 </div>
                 <div className="pt-1 flex">
                   <a
-                    href={article.url}
+                    href={currentArticle.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 px-3.5 py-1.5 text-xs font-semibold text-amber-200 transition-colors"
@@ -681,9 +760,7 @@ export function ArticleModal({
             <div className="text-zinc-200 text-base sm:text-[17px] leading-relaxed space-y-4 pt-2">
               {contentBody ? (
                 <div className="prose prose-invert max-w-none text-zinc-300 leading-relaxed space-y-4">
-                  {contentBody.split("\n\n").map((para, i) => (
-                    <p key={i}>{para}</p>
-                  ))}
+                  {contentBody.split("\n\n").map(renderParagraph)}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-center space-y-2 text-zinc-400">
@@ -696,7 +773,7 @@ export function ArticleModal({
             {/* External Source Action Box */}
             <div className="pt-8 border-t border-zinc-800/80">
               <a
-                href={article.url}
+                href={currentArticle.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-between w-full rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-rose-500/40 p-4 transition-all group"
@@ -706,7 +783,7 @@ export function ArticleModal({
                     Ler matéria completa na fonte original
                   </p>
                   <p className="text-xs text-zinc-500 font-mono">
-                    {article.url}
+                    {currentArticle.url}
                   </p>
                 </div>
                 <div className="rounded-lg bg-zinc-800 p-2 text-zinc-400 group-hover:bg-rose-500/10 group-hover:text-rose-400 transition-colors">

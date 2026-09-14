@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
-from app.sources.sanitizer import sanitize_text
+from app.sources.sanitizer import sanitize_editorial_content
 from app.translation.base import (
     ArticleTranslationResult,
     BaseTranslationProvider,
@@ -259,11 +259,11 @@ class GoogleTranslateProvider(BaseTranslationProvider):
             # 3. Translate Content (if present)
             translated_content: str | None = None
             if content and content.strip():
-                clean_content = sanitize_text(content, max_length=4000)
+                clean_content = sanitize_editorial_content(content)
                 if clean_content:
                     chunks = _chunk_text_google(clean_content)
                     parts = []
-                    for c in chunks[:4]:
+                    for c in chunks[:12]:
                         part, _ = await self._fetch_single_segment(client, c, target_lang, src)
                         parts.append(part)
                     translated_content = "\n\n".join(parts) if len(parts) > 1 else parts[0]
